@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secret Santa - La Maison des Secrets</title>
+    <style>
+        :root {
+            --pink: #ff007f;
+            --blue: #00d4ff;
+            --dark: #0a0a0c;
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Oswald', sans-serif;
+            background-color: var(--dark);
+            background-image: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0c 100%);
+            color: white;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background: var(--glass);
+            backdrop-filter: blur(15px);
+            border: 2px solid var(--pink);
+            box-shadow: 0 0 20px var(--pink);
+            border-radius: 20px;
+            padding: 30px;
+            width: 400px;
+            text-align: center;
+        }
+
+        h1 {
+            color: var(--blue);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 5px;
+        }
+
+        .voix-msg {
+            font-style: italic;
+            font-size: 0.9em;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+
+        input {
+            width: 80%;
+            padding: 12px;
+            border-radius: 50px;
+            border: 1px solid var(--blue);
+            background: rgba(0,0,0,0.5);
+            color: white;
+            margin-bottom: 10px;
+            outline: none;
+        }
+
+        button {
+            background: var(--pink);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            box-shadow: 0 0 15px var(--pink);
+            transform: scale(1.05);
+        }
+
+        .list-participants {
+            text-align: left;
+            margin: 20px 0;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .participant-tag {
+            background: rgba(0, 212, 255, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 5px;
+            border: 1px solid var(--blue);
+        }
+
+        .hidden { display: none; }
+
+        .result-reveal {
+            font-size: 1.5em;
+            color: var(--pink);
+            margin-top: 20px;
+            font-weight: bold;
+            text-shadow: 0 0 10px var(--pink);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="setup-step">
+        <h1>Ici La Voix</h1>
+        <p class="voix-msg">C'est tout pour le moment... Créez votre groupe.</p>
+        <input type="text" id="group-name" placeholder="Nom du Secret Santa">
+        <button onclick="createGroup()">Créer le Groupe</button>
+    </div>
+
+    <div id="join-step" class="hidden">
+        <h1 id="display-group-name">Groupe</h1>
+        <p class="voix-msg">Inscrivez votre prénom pour entrer dans la Maison.</p>
+        
+        <div class="list-participants" id="participant-list">
+            </div>
+
+        <div id="registration">
+            <input type="text" id="player-name" placeholder="Ton prénom">
+            <button onclick="addPlayer()">S'inscrire</button>
+        </div>
+
+        <div id="admin-zone" class="hidden" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 10px;">
+            <button onclick="revealTargets()" style="background: var(--blue);">Lancer le tirage au sort</button>
+        </div>
+    </div>
+
+    <div id="reveal-step" class="hidden">
+        <h1>Ta Mission</h1>
+        <p class="voix-msg">Ton identité est secrète, ton cadeau aussi.</p>
+        <div id="personal-assignment" class="result-reveal"></div>
+        <br>
+        <button onclick="location.reload()">Retour</button>
+    </div>
+</div>
+
+<script>
+    let participants = JSON.parse(localStorage.getItem('ss_participants')) || [];
+    let groupName = localStorage.getItem('ss_groupname') || "";
+
+    // Initialisation
+    if(groupName) {
+        showJoinStep();
+    }
+
+    function createGroup() {
+        const name = document.getElementById('group-name').value;
+        if(name) {
+            groupName = name;
+            localStorage.setItem('ss_groupname', name);
+            showJoinStep();
+        }
+    }
+
+    function showJoinStep() {
+        document.getElementById('setup-step').classList.add('hidden');
+        document.getElementById('join-step').classList.remove('hidden');
+        document.getElementById('display-group-name').innerText = groupName;
+        updateList();
+        if(participants.length >= 3) {
+            document.getElementById('admin-zone').classList.remove('hidden');
+        }
+    }
+
+    function addPlayer() {
+        const name = document.getElementById('player-name').value;
+        if(name && !participants.find(p => p.name === name)) {
+            participants.push({name: name, target: null});
+            localStorage.setItem('ss_participants', JSON.stringify(participants));
+            document.getElementById('player-name').value = "";
+            updateList();
+            if(participants.length >= 3) document.getElementById('admin-zone').classList.remove('hidden');
+        }
+    }
+
+    function updateList() {
+        const listDiv = document.getElementById('participant-list');
+        listDiv.innerHTML = participants.map(p => `<span class="participant-tag">${p.name}</span>`).join('');
+    }
+
+    function revealTargets() {
+        // Algorithme de mélange (Fisher-Yates)
+        let shuffled = [...participants];
+        let valid = false;
+
+        while (!valid) {
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            valid = participants.every((p, i) => p.name !== shuffled[i].name);
+        }
+
+        // Attribution
+        const userSideName = prompt("Entrez votre prénom pour voir qui est votre cible :");
+        const found = participants.find(p => p.name.toLowerCase() === userSideName.toLowerCase());
+        
+        if (found) {
+            const index = participants.indexOf(found);
+            document.getElementById('join-step').classList.add('hidden');
+            document.getElementById('reveal-step').classList.remove('hidden');
+            document.getElementById('personal-assignment').innerText = `Tu dois offrir un cadeau à : ${shuffled[index].name}`;
+        } else {
+            alert("Prénom non trouvé dans la liste !");
+        }
+    }
+</script>
+
+</body>
+</html>
