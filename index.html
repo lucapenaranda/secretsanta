@@ -5,66 +5,130 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secret Santa - La Maison des Cadeaux</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <style>
-        :root { --red: #b33939; --green: #218c74; --snow: #f1f2f6; }
-        body { 
-            font-family: 'Segoe UI', sans-serif; 
-            background: #1a472a; 
-            margin: 0; overflow-x: hidden;
-            display: flex; justify-content: center; align-items: center; min-height: 100vh;
-        }
-        /* Effet de neige */
-        #snow { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+    <script>
+    // --- 1. CONFIGURATION UNIQUE ---
+    // Vérifie bien qu'il n'y a qu'une seule déclaration de 'const supabase'
+    const supabaseUrl = 'TON_URL_ICI';
+    const supabaseKey = 'TA_CLE_ANON_ICI';
+    
+    // Création du client Supabase
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+    // --- 2. VARIABLES D'ÉTAT ---
+    let me = { name: "" };
+    let currentGroupId = null;
+
+    // --- 3. FONCTIONS ---
+    async function login() {
+        const nameInput = document.getElementById('user-name');
+        if(!nameInput || !nameInput.value) return alert("Indique ton prénom !");
         
-        .card { 
-            background: white; color: #333; padding: 40px; border-radius: 20px; 
-            width: 380px; text-align: center; position: relative; z-index: 1;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.4); border: 5px solid var(--red);
+        me.name = nameInput.value;
+        document.getElementById('welcome-txt').innerText = "Salut " + me.name + " ! 🎄";
+        document.getElementById('login-view').classList.add('hidden');
+        document.getElementById('main-view').classList.remove('hidden');
+        await loadGroups();
+    }
+
+    async function loadGroups() {
+        const { data, error } = await supabase.from('groups').select('*');
+        if(error) {
+            console.error("Erreur chargement groupes:", error);
+            return;
         }
-        h1 { color: var(--red); font-size: 2em; margin-bottom: 20px; }
-        input { width: 90%; padding: 12px; margin: 10px 0; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
-        .btn { 
-            width: 100%; padding: 15px; border: none; border-radius: 8px; 
-            cursor: pointer; font-weight: bold; text-transform: uppercase; 
-            background: var(--red); color: white; transition: 0.3s;
+        const container = document.getElementById('groups-container');
+        container.innerHTML = data.length ? "" : "Aucun groupe pour le moment.";
+        data.forEach(g => {
+            container.innerHTML += `
+                <div class="group-item">
+                    <span><strong>${g.name}</strong></span>
+                    <button class="btn btn-green" style="width:auto; padding:8px 15px;" onclick="openGroup('${g.id}', '${g.name}')">Rejoindre</button>
+                </div>`;
+        });
+    }
+
+    async function createGroup() {
+        const name = document.getElementById('group-name-input').value;
+        if(!name) return;
+        const { error } = await supabase.from('groups').insert([{ name }]);
+        if(error) alert("Erreur lors de la création : " + error.message);
+        
+        document.getElementById('group-name-input').value = "";
+        await loadGroups();
+    }
+
+    async function openGroup(id, name) {
+        currentGroupId = id;
+        document.getElementById('main-view').classList.add('hidden');
+        document.getElementById('group-view').classList.remove('hidden');
+        document.getElementById('current-group-name').innerText = name;
+        document.getElementById('result-display').innerText = "";
+        await loadParticipants();
+    }
+
+    function showMain() {
+        document.getElementById('group-view').classList.add('hidden');
+        document.getElementById('main-view').classList.remove('hidden');
+        loadGroups();
+    }
+
+    async function joinGroup() {
+        const { error } = await supabase.from('participants').insert([{ group_id: currentGroupId, name: me.name }]);
+        if(error) alert("Tu es déjà dans la liste ou erreur de connexion.");
+        await loadParticipants();
+    }
+
+    async function loadParticipants() {
+        const { data, error } = await supabase.from('participants').select('name').eq('group_id', currentGroupId);
+        if(error) return console.error(error);
+        document.getElementById('participants-list').innerHTML = "Inscrits : " + data.map(p => p.name).join(', ');
+    }
+
+    async function revealSecret() {
+        const { data } = await supabase.from('participants').select('name').eq('group_id', currentGroupId);
+        if(data.length < 3) return alert("Il faut au moins 3 participants !");
+        
+        let list = data.map(p => p.name).sort();
+        let targets = [...list];
+        targets.push(targets.shift()); 
+
+        const idx = list.indexOf(me.name);
+        if(idx === -1) return alert("Tu ne participes pas à ce groupe !");
+        
+        document.getElementById('result-display').innerHTML = "Tu dois offrir à : <br>⭐ " + targets[idx] + " ⭐";
+    }
+
+    // --- 4. ANIMATION NEIGE (Optionnel) ---
+    const canvas = document.getElementById('snow');
+    if(canvas) {
+        const ctx = canvas.getContext('2d');
+        let width, height, flakes = [];
+
+        function initSnow() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            flakes = [];
+            for(let i=0; i<100; i++) flakes.push({x: Math.random()*width, y: Math.random()*height, r: Math.random()*3+1, d: Math.random()+0.5});
         }
-        .btn:hover { transform: scale(1.02); filter: brightness(1.2); }
-        .btn-green { background: var(--green); }
-        .hidden { display: none; }
-        .group-item { background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--green); }
-    </style>
-</head>
-<body>
 
-<canvas id="snow"></canvas>
-
-<div class="card">
-    <div id="login-view">
-        <h1>🎅 Connexion</h1>
-        <input type="text" id="user-name" placeholder="Ton Prénom">
-        <input type="password" id="user-pass" placeholder="Mot de passe secret">
-        <button class="btn" onclick="login()">Entrer dans la Maison</button>
-    </div>
-
-    <div id="main-view" class="hidden">
-        <h2 id="welcome-txt">Salut !</h2>
-        <input type="text" id="group-name-input" placeholder="Nom du nouveau groupe">
-        <button class="btn" onclick="createGroup()">Créer un groupe</button>
-        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee;">
-        <div id="groups-container">Chargement des groupes...</div>
-    </div>
-
-    <div id="group-view" class="hidden">
-        <button onclick="showMain()" style="border:none; background:none; color:var(--red); cursor:pointer; font-weight:bold;">← Retour</button>
-        <h2 id="current-group-name">Groupe</h2>
-        <div id="participants-list" style="margin: 20px 0; font-style: italic;"></div>
-        <button class="btn btn-green" onclick="joinGroup()">Je participe !</button>
-        <button class="btn" onclick="revealSecret()" style="margin-top: 15px; background: #d35400;">Voir ma cible 🎁</button>
-        <div id="result-display" style="font-weight:bold; color:var(--green); margin-top:15px; font-size: 1.2em;"></div>
-    </div>
-</div>
-
-<script>
+        function drawSnow() {
+            ctx.clearRect(0,0,width,height);
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            flakes.forEach(f => {
+                ctx.moveTo(f.x, f.y);
+                ctx.arc(f.x, f.y, f.r, 0, Math.PI*2);
+                f.y += f.d; f.x += Math.sin(f.y/50);
+                if(f.y > height) f.y = -10;
+            });
+            ctx.fill();
+            requestAnimationFrame(drawSnow);
+        }
+        window.onresize = initSnow;
+        initSnow(); 
+        drawSnow();
+    }
+</script>
     // --- REMPLACE ICI ---
     const supabaseUrl = 'https://reeezxhcvsmcurodqxyw.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNzMwOTAsImV4cCI6MjA4MTY0OTA5MH0.Vg8ZADo1X4P9c_Rhs21jGUMThhc9MbdD3ETLZS9EDhw';
