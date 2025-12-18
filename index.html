@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secret Santa - La Maison des Secrets</title>
+    <title>Secret Santa - Noël</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --red: #b33939; --green: #218c74; }
         body { font-family: 'Segoe UI', sans-serif; background: #1a472a; color: white; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
         .card { background: white; color: #333; padding: 30px; border-radius: 15px; width: 350px; text-align: center; border: 5px solid var(--red); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; z-index: 10; }
-        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
         .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; background: var(--red); color: white; margin-top: 10px; }
         .hidden { display: none; }
         .group-item { background: #f1f2f6; padding: 12px; margin: 10px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
@@ -22,39 +22,35 @@
 
 <div class="card">
     <div id="login-view">
-        <h1 style="color:var(--red)">🎅 Noël Secret</h1>
+        <h1 style="color:var(--red)">🎅 Connexion</h1>
         <input type="text" id="user-name" placeholder="Ton Prénom">
-        <input type="password" id="user-pass" placeholder="Ton Mot de passe">
-        <button class="btn" onclick="login()">Se connecter / S'inscrire</button>
+        <input type="password" id="user-pass" placeholder="Mot de passe">
+        <button class="btn" onclick="login()">ENTRER DANS LA MAISON</button>
     </div>
 
     <div id="main-view" class="hidden">
         <h2 id="welcome-txt">Salut !</h2>
-        <input type="text" id="group-name-input" placeholder="Nom du nouveau groupe">
-        <button class="btn" onclick="createGroup()">Créer ce groupe</button>
-        <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
-        <div id="groups-container">Chargement...</div>
+        <input type="text" id="group-name-input" placeholder="Nom du groupe">
+        <button class="btn" onclick="createGroup()">Créer un groupe</button>
+        <div id="groups-container" style="margin-top:20px">Chargement...</div>
     </div>
 
     <div id="group-view" class="hidden">
         <button onclick="showMain()" style="cursor:pointer; border:none; background:none; color:var(--red); font-weight:bold; float:left;">← Retour</button>
-        <br><h2 id="current-group-name">Groupe</h2>
-        <div id="participants-list" style="margin: 15px 0; font-style: italic; font-size: 0.9em; color:#666;"></div>
-        <button class="btn" onclick="joinGroup()" style="background:var(--green)">M'inscrire au tirage</button>
+        <br><h2>Groupe</h2>
+        <div id="participants-list" style="margin: 15px 0; font-style: italic;"></div>
+        <button class="btn" onclick="joinGroup()" style="background:var(--green)">M'inscrire</button>
         <button class="btn" onclick="revealSecret()" style="margin-top: 15px; background: #e67e22;">🎁 Voir ma cible</button>
-        <div id="result-display" style="font-weight:bold; color:var(--green); margin-top:15px; font-size: 1.1em;"></div>
+        <div id="result-display" style="font-weight:bold; color:var(--green); margin-top:15px"></div>
     </div>
 </div>
 
 <script>
-    // --- CONFIGURATION UNIQUE ---
-    const supabaseUrl = 'https://reeezxhcvsmcurodqxyw.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeXl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1Mzc4MzIsImV4cCI6MjA1MDEwOTgzMn0.sV_S_nL6i915LIn5InV6eGhjdnN0Y3Vyb2RxeXl3'; 
+    // UNE SEULE DECLARATION ICI
+    const SUPA_URL = 'https://reeezxhcvsmcurodqxyw.supabase.co';
+    const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeXl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1Mzc4MzIsImV4cCI6MjA1MDEwOTgzMn0.sV_S_nL6i915LIn5InV6eGhjdnN0Y3Vyb2RxeXl3';
     
-    // Vérification de sécurité pour éviter le doublon
-    if (typeof supabase === 'undefined') {
-        var supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
-    }
+    const client = supabase.createClient(SUPA_URL, SUPA_KEY);
 
     let me = { name: "", pass: "" };
     let currentGroupId = null;
@@ -62,80 +58,63 @@
     async function login() {
         const n = document.getElementById('user-name').value;
         const p = document.getElementById('user-pass').value;
-        if(!n || !p) return alert("Prénom et mot de passe requis !");
+        if(!n || !p) return alert("Remplis tout !");
         me = { name: n, pass: p };
-        document.getElementById('welcome-txt').innerText = "Salut " + n + " ! 🎄";
+        document.getElementById('welcome-txt').innerText = "Salut " + n + " !";
         document.getElementById('login-view').classList.add('hidden');
         document.getElementById('main-view').classList.remove('hidden');
-        await loadGroups();
+        loadGroups();
     }
 
     async function loadGroups() {
-        const { data, error } = await supabaseClient.from('groups').select('*');
+        const { data } = await client.from('groups').select('*');
         const container = document.getElementById('groups-container');
-        container.innerHTML = (data && data.length) ? "" : "Aucun groupe créé.";
+        container.innerHTML = (data && data.length) ? "" : "Aucun groupe.";
         if(data) data.forEach(g => {
-            container.innerHTML += `<div class="group-item">
-                <span><strong>${g.name}</strong></span>
-                <button onclick="openGroup('${g.id}', '${g.name}')" style="cursor:pointer; background:var(--green); color:white; border:none; padding:5px 10px; border-radius:5px;">Entrer</button>
-            </div>`;
+            container.innerHTML += `<div class="group-item"><span>${g.name}</span><button onclick="openGroup('${g.id}', '${g.name}')" style="background:var(--green); color:white; border:none; padding:5px; border-radius:5px; cursor:pointer">Entrer</button></div>`;
         });
     }
 
     async function createGroup() {
         const name = document.getElementById('group-name-input').value;
         if(!name) return;
-        await supabaseClient.from('groups').insert([{ name }]);
-        document.getElementById('group-name-input').value = "";
-        await loadGroups();
+        await client.from('groups').insert([{ name }]);
+        loadGroups();
     }
 
     async function openGroup(id, name) {
         currentGroupId = id;
         document.getElementById('main-view').classList.add('hidden');
         document.getElementById('group-view').classList.remove('hidden');
-        document.getElementById('current-group-name').innerText = name;
-        document.getElementById('result-display').innerText = "";
-        await loadParticipants();
+        loadParticipants();
     }
 
     function showMain() {
         document.getElementById('group-view').classList.add('hidden');
         document.getElementById('main-view').classList.remove('hidden');
-        loadGroups();
     }
 
     async function joinGroup() {
-        const { error } = await supabaseClient.from('participants').insert([{ 
-            group_id: currentGroupId, 
-            name: me.name,
-            user_password: me.pass 
-        }]);
-        if(error) alert("Déjà inscrit !");
-        await loadParticipants();
+        await client.from('participants').insert([{ group_id: currentGroupId, name: me.name, user_password: me.pass }]);
+        loadParticipants();
     }
 
     async function loadParticipants() {
-        const { data } = await supabaseClient.from('participants').select('name').eq('group_id', currentGroupId);
+        const { data } = await client.from('participants').select('name').eq('group_id', currentGroupId);
         document.getElementById('participants-list').innerText = "Inscrits : " + (data ? data.map(p => p.name).join(', ') : "");
     }
 
     async function revealSecret() {
-        const { data } = await supabaseClient.from('participants').select('*').eq('group_id', currentGroupId);
-        if(!data || data.length < 3) return alert("Il faut au moins 3 inscrits !");
-        
-        const myRecord = data.find(p => p.name === me.name);
-        if(!myRecord || myRecord.user_password !== me.pass) return alert("Erreur de compte !");
-
+        const { data } = await client.from('participants').select('*').eq('group_id', currentGroupId);
+        if(!data || data.length < 3) return alert("Besoin de 3 personnes !");
         let list = data.map(p => p.name).sort();
         let targets = [...list];
         targets.push(targets.shift());
-        
         const idx = list.indexOf(me.name);
-        document.getElementById('result-display').innerHTML = "Cadeau pour :<br>🎁 <strong>" + targets[idx] + "</strong> 🎁";
+        document.getElementById('result-display').innerText = idx !== -1 ? "Tu offres à : " + targets[idx] : "Inscris-toi !";
     }
 
-    // --- NEIGE ---
+    // Neige
     const canvas = document.getElementById('snow');
     const ctx = canvas.getContext('2d');
     let flakes = [];
@@ -148,7 +127,7 @@
         flakes.forEach(f => { ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, f.r, 0, Math.PI*2); f.y += f.d; if(f.y > canvas.height) f.y = -10; });
         ctx.fill(); requestAnimationFrame(draw);
     }
-    window.onresize = init; init(); draw();
+    init(); draw();
 </script>
 </body>
 </html>
