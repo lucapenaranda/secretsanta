@@ -3,214 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secret Santa - La Maison des Secrets</title>
+    <title>Le Secret Santa de Noël</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
-            --pink: #ff007f;
-            --blue: #00d4ff;
-            --dark: #0a0a0c;
-            --glass: rgba(255, 255, 255, 0.1);
+            --red: #c0392b;
+            --green: #27ae60;
+            --gold: #f1c40f;
+            --snow: #ecf0f1;
         }
 
         body {
-            font-family: 'Oswald', sans-serif;
-            background-color: var(--dark);
-            background-image: radial-gradient(circle at center, #1a1a2e 0%, #0a0a0c 100%);
-            color: white;
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
+            font-family: 'Georgia', serif;
+            background: #1a472a url('https://www.transparenttextures.com/patterns/snow.png');
+            color: var(--snow);
+            margin: 0; padding: 20px;
+            display: flex; justify-content: center;
         }
 
         .container {
-            background: var(--glass);
-            backdrop-filter: blur(15px);
-            border: 2px solid var(--pink);
-            box-shadow: 0 0 20px var(--pink);
-            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
             padding: 30px;
-            width: 400px;
+            border-radius: 15px;
+            width: 100%; max-width: 600px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            border: 5px solid var(--red);
             text-align: center;
         }
 
-        h1 {
-            color: var(--blue);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin-bottom: 5px;
+        h1 { color: var(--red); font-size: 2.5em; margin-top: 0; }
+        .btn {
+            background: var(--red); color: white; border: none;
+            padding: 10px 20px; border-radius: 5px; cursor: pointer;
+            font-weight: bold; margin: 5px;
         }
-
-        .voix-msg {
-            font-style: italic;
-            font-size: 0.9em;
-            color: #ccc;
-            margin-bottom: 20px;
-        }
-
+        .btn-green { background: var(--green); }
+        
         input {
-            width: 80%;
-            padding: 12px;
-            border-radius: 50px;
-            border: 1px solid var(--blue);
-            background: rgba(0,0,0,0.5);
-            color: white;
-            margin-bottom: 10px;
-            outline: none;
+            padding: 10px; border: 2px solid #ddd; border-radius: 5px;
+            width: 70%; margin-bottom: 10px;
         }
 
-        button {
-            background: var(--pink);
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 50px;
-            cursor: pointer;
-            font-weight: bold;
-            text-transform: uppercase;
-            transition: 0.3s;
-        }
-
-        button:hover {
-            box-shadow: 0 0 15px var(--pink);
-            transform: scale(1.05);
-        }
-
-        .list-participants {
-            text-align: left;
-            margin: 20px 0;
-            max-height: 150px;
-            overflow-y: auto;
-        }
-
-        .participant-tag {
-            background: rgba(0, 212, 255, 0.2);
-            padding: 5px 15px;
-            border-radius: 20px;
-            display: inline-block;
-            margin: 5px;
-            border: 1px solid var(--blue);
+        .group-card {
+            border: 1px solid #ddd; padding: 15px; margin: 10px 0;
+            border-radius: 10px; display: flex; justify-content: space-between;
+            align-items: center; background: white;
         }
 
         .hidden { display: none; }
-
-        .result-reveal {
-            font-size: 1.5em;
-            color: var(--pink);
-            margin-top: 20px;
-            font-weight: bold;
-            text-shadow: 0 0 10px var(--pink);
-        }
+        .santa-icon { font-size: 3em; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="setup-step">
-        <h1>Ici La Voix</h1>
-        <p class="voix-msg">C'est tout pour le moment... Créez votre groupe.</p>
-        <input type="text" id="group-name" placeholder="Nom du Secret Santa">
-        <button onclick="createGroup()">Créer le Groupe</button>
-    </div>
-
-    <div id="join-step" class="hidden">
-        <h1 id="display-group-name">Groupe</h1>
-        <p class="voix-msg">Inscrivez votre prénom pour entrer dans la Maison.</p>
+    <div id="home-view">
+        <div class="santa-icon">🎅</div>
+        <h1>Les Groupes de Noël</h1>
         
-        <div class="list-participants" id="participant-list">
-            </div>
-
-        <div id="registration">
-            <input type="text" id="player-name" placeholder="Ton prénom">
-            <button onclick="addPlayer()">S'inscrire</button>
+        <div style="margin-bottom: 30px;">
+            <input type="text" id="new-group-name" placeholder="Nom du nouveau groupe...">
+            <button class="btn" onclick="createNewGroup()">Créer un groupe</button>
         </div>
 
-        <div id="admin-zone" class="hidden" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 10px;">
-            <button onclick="revealTargets()" style="background: var(--blue);">Lancer le tirage au sort</button>
+        <div id="groups-list">
+            <p>Chargement des festivités...</p>
         </div>
     </div>
 
-    <div id="reveal-step" class="hidden">
-        <h1>Ta Mission</h1>
-        <p class="voix-msg">Ton identité est secrète, ton cadeau aussi.</p>
-        <div id="personal-assignment" class="result-reveal"></div>
-        <br>
-        <button onclick="location.reload()">Retour</button>
+    <div id="group-view" class="hidden">
+        <button class="btn" onclick="showHome()" style="float: left;">← Retour</button>
+        <h1 id="current-group-title">Groupe</h1>
+        <p>Inscris-toi pour participer au tirage au sort !</p>
+        
+        <input type="text" id="player-name" placeholder="Ton prénom">
+        <button class="btn btn-green" onclick="joinGroup()">S'inscrire</button>
+
+        <div id="participants-list" style="margin: 20px 0; font-weight: bold;"></div>
+        
+        <hr>
+        <button class="btn" onclick="shuffleSecretSanta()">Lancer le tirage de Noël</button>
+        <div id="result-area" style="margin-top: 20px; font-size: 1.2em; color: var(--green);"></div>
     </div>
 </div>
 
 <script>
-    let participants = JSON.parse(localStorage.getItem('ss_participants')) || [];
-    let groupName = localStorage.getItem('ss_groupname') || "";
+    // INITIALISATION SUPABASE
+    const supabaseUrl = 'https://reeezxhcvsmcurodqxyw.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNzMwOTAsImV4cCI6MjA4MTY0OTA5MH0.Vg8ZADo1X4P9c_Rhs21jGUMThhc9MbdD3ETLZS9EDhw';
+    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
-    // Initialisation
-    if(groupName) {
-        showJoinStep();
+    let currentGroupId = null;
+
+    async function loadGroups() {
+        const { data, error } = await supabase.from('groups').select('*').order('created_at', { ascending: false });
+        const listDiv = document.getElementById('groups-list');
+        listDiv.innerHTML = "";
+        data.forEach(g => {
+            listDiv.innerHTML += `
+                <div class="group-card">
+                    <span><strong>${g.name}</strong></span>
+                    <button class="btn btn-green" onclick="openGroup('${g.id}', '${g.name}')">Rejoindre</button>
+                </div>`;
+        });
     }
 
-    function createGroup() {
-        const name = document.getElementById('group-name').value;
-        if(name) {
-            groupName = name;
-            localStorage.setItem('ss_groupname', name);
-            showJoinStep();
-        }
+    async function createNewGroup() {
+        const name = document.getElementById('new-group-name').value;
+        if (!name) return;
+        await supabase.from('groups').insert([{ name }]);
+        document.getElementById('new-group-name').value = "";
+        loadGroups();
     }
 
-    function showJoinStep() {
-        document.getElementById('setup-step').classList.add('hidden');
-        document.getElementById('join-step').classList.remove('hidden');
-        document.getElementById('display-group-name').innerText = groupName;
-        updateList();
-        if(participants.length >= 3) {
-            document.getElementById('admin-zone').classList.remove('hidden');
-        }
+    async function openGroup(id, name) {
+        currentGroupId = id;
+        document.getElementById('home-view').classList.add('hidden');
+        document.getElementById('group-view').classList.remove('hidden');
+        document.getElementById('current-group-title').innerText = name;
+        loadParticipants();
     }
 
-    function addPlayer() {
+    function showHome() {
+        document.getElementById('home-view').classList.remove('hidden');
+        document.getElementById('group-view').classList.add('hidden');
+        loadGroups();
+    }
+
+    async function joinGroup() {
         const name = document.getElementById('player-name').value;
-        if(name && !participants.find(p => p.name === name)) {
-            participants.push({name: name, target: null});
-            localStorage.setItem('ss_participants', JSON.stringify(participants));
-            document.getElementById('player-name').value = "";
-            updateList();
-            if(participants.length >= 3) document.getElementById('admin-zone').classList.remove('hidden');
-        }
+        if (!name) return;
+        await supabase.from('participants').insert([{ group_id: currentGroupId, name }]);
+        document.getElementById('player-name').value = "";
+        loadParticipants();
     }
 
-    function updateList() {
-        const listDiv = document.getElementById('participant-list');
-        listDiv.innerHTML = participants.map(p => `<span class="participant-tag">${p.name}</span>`).join('');
+    async function loadParticipants() {
+        const { data } = await supabase.from('participants').select('name').eq('group_id', currentGroupId);
+        document.getElementById('participants-list').innerHTML = "Participants : " + data.map(p => p.name).join(', ');
     }
 
-    function revealTargets() {
-        // Algorithme de mélange (Fisher-Yates)
-        let shuffled = [...participants];
-        let valid = false;
+    async function shuffleSecretSanta() {
+        const { data: participants } = await supabase.from('participants').select('*').eq('group_id', currentGroupId);
+        if (participants.length < 3) return alert("Il faut au moins 3 personnes !");
 
-        while (!valid) {
-            for (let i = shuffled.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-            }
-            valid = participants.every((p, i) => p.name !== shuffled[i].name);
-        }
-
-        // Attribution
-        const userSideName = prompt("Entrez votre prénom pour voir qui est votre cible :");
-        const found = participants.find(p => p.name.toLowerCase() === userSideName.toLowerCase());
+        let names = participants.map(p => p.name);
+        let shuffled = [...names];
         
-        if (found) {
-            const index = participants.indexOf(found);
-            document.getElementById('join-step').classList.add('hidden');
-            document.getElementById('reveal-step').classList.remove('hidden');
-            document.getElementById('personal-assignment').innerText = `Tu dois offrir un cadeau à : ${shuffled[index].name}`;
+        // Tirage au sort
+        let valid = false;
+        while (!valid) {
+            shuffled.sort(() => Math.random() - 0.5);
+            valid = participants.every((p, i) => p.name !== shuffled[i]);
+        }
+
+        const myName = prompt("Entrez votre prénom pour voir votre cible :");
+        const index = names.indexOf(myName);
+        if (index !== -1) {
+            document.getElementById('result-area').innerHTML = `🎄 🎁 Tu dois faire un cadeau à : <strong>${shuffled[index]}</strong>`;
         } else {
-            alert("Prénom non trouvé dans la liste !");
+            alert("Tu n'es pas dans la liste !");
         }
     }
-</script>
 
+    loadGroups();
+</script>
 </body>
 </html>
