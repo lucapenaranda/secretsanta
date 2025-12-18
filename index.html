@@ -71,22 +71,31 @@
         document.getElementById('toggle-auth').innerText = isLoginMode ? "Pas encore de compte ? S'inscrire" : "Déjà un compte ? Se connecter";
     }
 
-    async function handleAuth() {
-        const n = document.getElementById('auth-name').value.trim();
-        const p = document.getElementById('auth-pass').value.trim();
-        if(!n || !p) return alert("Remplis tout !");
+async function handleAuth() {
+    const n = document.getElementById('auth-name').value.trim();
+    const p = document.getElementById('auth-pass').value.trim();
+    if(!n || !p) return alert("Remplis tout !");
 
-        if (isLoginMode) {
-            const { data, error } = await sb.from('profiles').select('*').eq('name', n).eq('password', p).single();
-            if (error || !data) return alert("Erreur de connexion. Vérifie tes identifiants.");
-            enterApp(n);
-        } else {
-            const { error } = await sb.from('profiles').insert([{ name: n, password: p }]);
-            if (error) return alert("Ce nom est déjà pris !");
-            alert("Compte créé ! Tu peux maintenant te connecter.");
-            toggleAuth();
+    console.log("Tentative avec :", n);
+
+    if (isLoginMode) {
+        const { data, error } = await sb.from('profiles').select('*').eq('name', n).eq('password', p).single();
+        if (error) {
+            console.error("Erreur Connexion:", error);
+            return alert("Erreur : " + error.message);
         }
+        enterApp(n);
+    } else {
+        const { data, error } = await sb.from('profiles').insert([{ name: n, password: p }]);
+        if (error) {
+            console.error("Erreur Inscription:", error);
+            // Si l'erreur est 401 ici, c'est ta clé S_KEY qui est fausse
+            return alert("Erreur Supabase ("+error.code+"): " + error.message);
+        }
+        alert("Compte créé ! Tu peux maintenant te connecter.");
+        toggleAuth();
     }
+}
 
     function enterApp(name) {
         user.name = name;
