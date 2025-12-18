@@ -10,8 +10,8 @@
         body { font-family: 'Segoe UI', sans-serif; background: #1a472a; color: white; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
         .card { background: white; color: #333; padding: 30px; border-radius: 15px; width: 380px; text-align: center; border: 5px solid var(--red); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; z-index: 10; }
         input { width: 90%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 15px; }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; background: var(--red); color: white; margin-top: 10px; transition: 0.3s; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; background: var(--red); color: white; margin-top: 10px; }
+        .link-auth { display: block; margin-top: 15px; font-size: 0.8em; color: var(--red); cursor: pointer; text-decoration: underline; }
         .hidden { display: none; }
         .group-item { background: #f1f2f6; padding: 12px; margin: 10px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 5px solid var(--green); }
         canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 1; }
@@ -22,12 +22,12 @@
 <canvas id="snow"></canvas>
 
 <div class="card">
-    <div id="v-login">
-        <h1 style="color:var(--red)">🎅 Bienvenue</h1>
-        <p style="font-size: 0.9em;">Ton profil est créé dès que tu entres.</p>
-        <input type="text" id="log-name" placeholder="Ton Prénom">
-        <input type="password" id="log-pass" placeholder="Ton Mot de passe">
-        <button class="btn" onclick="appLogin()">ENTRER DANS LA MAISON</button>
+    <div id="v-auth">
+        <h1 id="auth-title" style="color:var(--red)">🎅 Connexion</h1>
+        <input type="text" id="auth-name" placeholder="Ton Prénom">
+        <input type="password" id="auth-pass" placeholder="Mot de passe">
+        <button id="btn-auth" class="btn" onclick="handleAuth()">SE CONNECTER</button>
+        <span class="link-auth" id="toggle-auth" onclick="toggleAuth()">Pas encore de compte ? S'inscrire</span>
     </div>
 
     <div id="v-main" class="hidden">
@@ -45,40 +45,53 @@
         <br><h2 id="cur-g-title">Groupe</h2>
         <p id="cur-g-info" style="font-weight: bold; color: var(--green);"></p>
         <div id="participants-list" style="margin: 15px 0; color: #666; font-style: italic;"></div>
-        
         <button id="btn-join" class="btn" onclick="appJoinGroup()" style="background:var(--green)">M'inscrire au tirage</button>
-        
         <div id="reveal-zone" class="hidden">
-            <p style="color: var(--red); font-weight: bold;">Le groupe est complet ! 🎁</p>
-            <button class="btn" onclick="appReveal()" style="background: var(--gold); color: #333;">DÉCOUVRIR MON SECRET SANTA</button>
+            <p style="color: var(--red); font-weight: bold;">Groupe complet ! 🎁</p>
+            <button class="btn" onclick="appReveal()" style="background: var(--gold); color: #333;">DÉCOUVRIR MA CIBLE</button>
         </div>
-        
         <div id="res-target" style="font-weight:bold; color:var(--green); margin-top:15px; font-size: 1.2em;"></div>
     </div>
 </div>
 
 <script>
+    // --- CONFIGURATION ---
     const S_URL = 'https://reeezxhcvsmcurodqxyw.supabase.co';
-    const S_KEY = 'TON_API_KEY'; // <--- METS TA CLÉ ICI
+    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeXl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1Mzc4MzIsImV4cCI6MjA1MDEwOTgzMn0.sV_S_nL6i915LIn5InV6eGhjdnN0Y3Vyb2RxeXl3';
     const sb = supabase.createClient(S_URL, S_KEY);
 
-    let user = { name: "", pass: "" };
-    let activeGroup = { id: null, name: "", limit: 0 };
+    let isLoginMode = true;
+    let user = { name: "" };
+    let activeGroup = { id: null, limit: 0 };
 
-    // --- LOGIQUE CONNEXION / CRÉATION PROFIL ---
-    async function appLogin() {
-        const n = document.getElementById('log-name').value.trim();
-        const p = document.getElementById('log-pass').value.trim();
-        if(!n || !p) return alert("Prénom et mot de passe requis !");
+    function toggleAuth() {
+        isLoginMode = !isLoginMode;
+        document.getElementById('auth-title').innerText = isLoginMode ? "🎅 Connexion" : "🎅 Inscription";
+        document.getElementById('btn-auth').innerText = isLoginMode ? "SE CONNECTER" : "S'INSCRIRE";
+        document.getElementById('toggle-auth').innerText = isLoginMode ? "Pas encore de compte ? S'inscrire" : "Déjà un compte ? Se connecter";
+    }
 
-        // On tente de créer le profil. S'il existe déjà, on vérifie juste le pass.
-        const { error } = await sb.from('profiles').upsert([{ name: n, password: p }], { onConflict: 'name' });
-        
-        if(error) return alert("Erreur de profil. Vérifie tes identifiants.");
-        
-        user = { name: n, pass: p };
-        document.getElementById('welcome-msg').innerText = "Salut " + n + " ! 🎄";
-        document.getElementById('v-login').classList.add('hidden');
+    async function handleAuth() {
+        const n = document.getElementById('auth-name').value.trim();
+        const p = document.getElementById('auth-pass').value.trim();
+        if(!n || !p) return alert("Remplis tout !");
+
+        if (isLoginMode) {
+            const { data, error } = await sb.from('profiles').select('*').eq('name', n).eq('password', p).single();
+            if (error || !data) return alert("Erreur de connexion. Vérifie tes identifiants.");
+            enterApp(n);
+        } else {
+            const { error } = await sb.from('profiles').insert([{ name: n, password: p }]);
+            if (error) return alert("Ce nom est déjà pris !");
+            alert("Compte créé ! Tu peux maintenant te connecter.");
+            toggleAuth();
+        }
+    }
+
+    function enterApp(name) {
+        user.name = name;
+        document.getElementById('welcome-msg').innerText = "Salut " + name + " ! 🎄";
+        document.getElementById('v-auth').classList.add('hidden');
         document.getElementById('v-main').classList.remove('hidden');
         loadGroups();
     }
@@ -89,10 +102,7 @@
         const cont = document.getElementById('groups-list');
         cont.innerHTML = (data && data.length) ? "" : "Aucun groupe créé.";
         if(data) data.forEach(g => {
-            cont.innerHTML += `<div class="group-item">
-                <span><strong>${g.name}</strong> (${g.max_slots} pers.)</span>
-                <button class="btn" style="width:auto; margin:0; padding:5px 10px; background:var(--green);" onclick="openGroup('${g.id}', '${g.name}', ${g.max_slots})">Entrer</button>
-            </div>`;
+            cont.innerHTML += `<div class="group-item"><span><strong>${g.name}</strong> (${g.max_slots} pers.)</span><button class="btn" style="width:auto; margin:0; padding:5px 10px; background:var(--green);" onclick="openGroup('${g.id}', '${g.name}', ${g.max_slots})">Entrer</button></div>`;
         });
     }
 
@@ -100,13 +110,9 @@
         const name = document.getElementById('new-g-name').value;
         const limit = document.getElementById('new-g-limit').value;
         if(!name || limit < 3) return alert("Nom valide et minimum 3 personnes !");
-
         const { error } = await sb.from('groups').insert([{ name: name, max_slots: limit }]);
         if(error) alert("Ce nom de groupe existe déjà.");
-        else {
-            document.getElementById('new-g-name').value = "";
-            loadGroups();
-        }
+        else { document.getElementById('new-g-name').value = ""; loadGroups(); }
     }
 
     async function openGroup(id, name, limit) {
@@ -114,7 +120,6 @@
         document.getElementById('v-main').classList.add('hidden');
         document.getElementById('v-group').classList.remove('hidden');
         document.getElementById('cur-g-title').innerText = name;
-        document.getElementById('res-target').innerText = "";
         loadParticipants();
     }
 
@@ -124,25 +129,11 @@
         loadGroups();
     }
 
-    // --- LOGIQUE PARTICIPANTS & TIRAGE ---
-    async function appJoinGroup() {
-        // Vérifier si le groupe est déjà plein
-        const { data: countData } = await sb.from('memberships').select('id').eq('group_id', activeGroup.id);
-        if(countData.length >= activeGroup.limit) return alert("Le groupe est déjà complet !");
-
-        const { error } = await sb.from('memberships').insert([{ group_id: activeGroup.id, profile_name: user.name }]);
-        if(error) alert("Tu es déjà dans ce groupe !");
-        loadParticipants();
-    }
-
     async function loadParticipants() {
         const { data } = await sb.from('memberships').select('profile_name').eq('group_id', activeGroup.id);
         const count = data ? data.length : 0;
-        
         document.getElementById('cur-g-info').innerText = `Participants : ${count} / ${activeGroup.limit}`;
         document.getElementById('participants-list').innerText = "Inscrits : " + (data ? data.map(m => m.profile_name).join(', ') : "");
-
-        // Gérer l'affichage des boutons
         if(count >= activeGroup.limit) {
             document.getElementById('btn-join').classList.add('hidden');
             document.getElementById('reveal-zone').classList.remove('hidden');
@@ -152,18 +143,18 @@
         }
     }
 
+    async function appJoinGroup() {
+        const { error } = await sb.from('memberships').insert([{ group_id: activeGroup.id, profile_name: user.name }]);
+        if(error) alert("Erreur (groupe plein ou tu es déjà inscrit).");
+        loadParticipants();
+    }
+
     async function appReveal() {
         const { data } = await sb.from('memberships').select('profile_name').eq('group_id', activeGroup.id);
-        
-        // Algorithme de tirage déterministe (toujours le même résultat pour une liste donnée)
         let list = data.map(m => m.profile_name).sort();
-        let targets = [...list];
-        targets.push(targets.shift()); // Décalage pour le Secret Santa
-
+        let targets = [...list]; targets.push(targets.shift());
         const idx = list.indexOf(user.name);
-        if(idx !== -1) {
-            document.getElementById('res-target').innerHTML = "🎁 Ta mission : Offrir un cadeau à <br><span style='font-size:1.5em; color:var(--red)'>" + targets[idx] + "</span>";
-        }
+        document.getElementById('res-target').innerHTML = "🎁 Offrir à : <br><span style='font-size:1.3em; color:var(--red)'>" + targets[idx] + "</span>";
     }
 
     // --- NEIGE ---
