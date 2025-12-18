@@ -3,18 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secret Santa de Noël</title>
+    <title>Secret Santa - Noël 2025</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --red: #b33939; --green: #218c74; }
-        body { font-family: 'Segoe UI', sans-serif; background: #1a472a; color: white; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
-        .card { background: white; color: #333; padding: 30px; border-radius: 15px; width: 350px; text-align: center; border: 5px solid var(--red); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        body { font-family: 'Segoe UI', sans-serif; background: #1a472a; color: white; margin: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
+        .card { background: white; color: #333; padding: 30px; border-radius: 15px; width: 350px; text-align: center; border: 5px solid var(--red); box-shadow: 0 10px 30px rgba(0,0,0,0.5); position: relative; z-index: 10; }
         input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; background: var(--red); color: white; margin-top: 10px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; background: var(--red); color: white; margin-top: 10px; transition: 0.2s; }
+        .btn:hover { opacity: 0.9; transform: scale(1.02); }
         .hidden { display: none; }
-        .group-item { background: #f1f2f6; padding: 12px; margin: 10px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-        canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 0; }
-        .card { position: relative; z-index: 10; }
+        .group-item { background: #f1f2f6; padding: 12px; margin: 10px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--green); }
+        canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 1; }
     </style>
 </head>
 <body>
@@ -23,8 +23,8 @@
 
 <div class="card">
     <div id="login-view">
-        <h1>🎅 Connexion</h1>
-        <p>Entre ton prénom et un mot de passe pour sécuriser ton tirage.</p>
+        <h1 style="color:var(--red)">🎅 Noël Secret</h1>
+        <p>Prénom + Mot de passe pour protéger ton secret.</p>
         <input type="text" id="user-name" placeholder="Ton Prénom">
         <input type="password" id="user-pass" placeholder="Ton Mot de passe">
         <button class="btn" onclick="login()">Se connecter / S'inscrire</button>
@@ -32,47 +32,46 @@
 
     <div id="main-view" class="hidden">
         <h2 id="welcome-txt">Salut !</h2>
-        <hr>
-        <h3>Créer un groupe</h3>
-        <input type="text" id="group-name-input" placeholder="Nom du groupe">
-        <button class="btn" onclick="createGroup()">Créer</button>
-        <hr>
-        <h3>Rejoindre un Secret Santa</h3>
+        <input type="text" id="group-name-input" placeholder="Nom du nouveau groupe">
+        <button class="btn" onclick="createGroup()">Créer ce groupe</button>
+        <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
         <div id="groups-container">Chargement...</div>
     </div>
 
     <div id="group-view" class="hidden">
-        <button onclick="showMain()" style="cursor:pointer; border:none; background:none; color:var(--red); font-weight:bold;">← Retour</button>
-        <h2 id="current-group-name">Groupe</h2>
-        <div id="participants-list" style="margin: 15px 0; font-style: italic;"></div>
-        <button class="btn" onclick="joinGroup()" style="background:var(--green)">S'inscrire à ce tirage</button>
-        <button class="btn" onclick="revealSecret()">🎁 Voir ma cible</button>
-        <div id="result-display" style="font-weight:bold; color:var(--green); margin-top:15px; font-size: 1.2em;"></div>
+        <button onclick="showMain()" style="cursor:pointer; border:none; background:none; color:var(--red); font-weight:bold; float:left;">← Retour</button>
+        <br><h2 id="current-group-name">Groupe</h2>
+        <div id="participants-list" style="margin: 15px 0; font-style: italic; font-size: 0.9em; color:#666;"></div>
+        <button class="btn" onclick="joinGroup()" style="background:var(--green)">M'inscrire au tirage</button>
+        <button class="btn" onclick="revealSecret()" style="margin-top: 15px; background: #e67e22;">🎁 Voir ma cible</button>
+        <div id="result-display" style="font-weight:bold; color:var(--green); margin-top:15px; font-size: 1.1em;"></div>
     </div>
 </div>
 
 <script>
-    // --- CONFIGURATION ---
-    const supabaseUrl = 'https://reeezxhcvsmcurodqxyw.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNzMwOTAsImV4cCI6MjA4MTY0OTA5MH0.Vg8ZADo1X4P9c_Rhs21jGUMThhc9MbdD3ETLZS9EDhw'; // <-- REMETS TA CLÉ ICI
-    const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+    // --- CONFIGURATION UNIQUE (AUCUN DOUBLON ICI) ---
+    const CONF_URL = 'https://reeezxhcvsmcurodqxyw.supabase.co';
+    const CONF_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNzMwOTAsImV4cCI6MjA4MTY0OTA5MH0.Vg8ZADo1X4P9c_Rhs21jGUMThhc9MbdD3ETLZS9EDhw'; // <-- REMETS TA CLÉ ICI (SANS SUPPRIMER LES GUILLEMETS)
+    
+    const supabase = supabase.createClient(CONF_URL, CONF_KEY);
 
     let me = { name: "", pass: "" };
     let currentGroupId = null;
 
     async function login() {
-        const name = document.getElementById('user-name').value;
-        const pass = document.getElementById('user-pass').value;
-        if(!name || !pass) return alert("Prénom et mot de passe requis !");
-        me = { name, pass };
-        document.getElementById('welcome-txt').innerText = "Salut " + name + " ! 🎄";
+        const n = document.getElementById('user-name').value.trim();
+        const p = document.getElementById('user-pass').value.trim();
+        if(!n || !p) return alert("Prénom et mot de passe obligatoires !");
+        me = { name: n, pass: p };
+        document.getElementById('welcome-txt').innerText = "Salut " + n + " ! 🎄";
         document.getElementById('login-view').classList.add('hidden');
         document.getElementById('main-view').classList.remove('hidden');
         loadGroups();
     }
 
     async function loadGroups() {
-        const { data } = await supabase.from('groups').select('*');
+        const { data, error } = await supabase.from('groups').select('*');
+        if(error) return console.error("Erreur:", error);
         const container = document.getElementById('groups-container');
         container.innerHTML = (data && data.length) ? "" : "Aucun groupe créé.";
         if(data) data.forEach(g => {
@@ -103,6 +102,7 @@
     function showMain() {
         document.getElementById('group-view').classList.add('hidden');
         document.getElementById('main-view').classList.remove('hidden');
+        loadGroups();
     }
 
     async function joinGroup() {
@@ -111,7 +111,7 @@
             name: me.name,
             user_password: me.pass 
         }]);
-        if(error) alert("Tu es déjà inscrit à ce groupe !");
+        if(error) alert("Erreur ou déjà inscrit !");
         loadParticipants();
     }
 
@@ -122,20 +122,18 @@
 
     async function revealSecret() {
         const { data } = await supabase.from('participants').select('*').eq('group_id', currentGroupId);
-        if(!data || data.length < 3) return alert("Il faut au moins 3 personnes !");
+        if(!data || data.length < 3) return alert("Il faut au moins 3 inscrits !");
         
-        // On vérifie le mot de passe de l'utilisateur actuel dans la liste
         const myRecord = data.find(p => p.name === me.name);
         if(!myRecord) return alert("Inscris-toi d'abord !");
-        if(myRecord.user_password !== me.pass) return alert("Mot de passe incorrect pour ce prénom !");
+        if(myRecord.user_password !== me.pass) return alert("Erreur de mot de passe pour ce prénom !");
 
-        // Algorithme de tirage stable
         let list = data.map(p => p.name).sort();
         let targets = [...list];
         targets.push(targets.shift());
         
         const idx = list.indexOf(me.name);
-        document.getElementById('result-display').innerHTML = "Ta mission :<br>🎁 Offrir à " + targets[idx] + " 🎁";
+        document.getElementById('result-display').innerHTML = "Mission Noël :<br>🎁 Offrir à <strong>" + targets[idx] + "</strong> 🎁";
     }
 
     // --- NEIGE ---
