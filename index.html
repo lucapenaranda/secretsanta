@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secret Santa de Noël</title>
+    <title>Secret Santa - La Maison des Cadeaux</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --red: #b33939; --green: #218c74; }
@@ -12,7 +12,7 @@
         input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 8px; font-size: 16px; }
         .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; background: var(--red); color: white; margin-top: 10px; }
         .hidden { display: none; }
-        .group-item { background: #f1f2f6; padding: 12px; margin: 10px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .group-item { background: #f1f2f6; padding: 12px; margin: 10px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--green); }
         canvas { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 1; }
     </style>
 </head>
@@ -24,104 +24,118 @@
     <div id="login-view">
         <h1 style="color:var(--red)">🎅 Connexion</h1>
         <input type="text" id="user-name" placeholder="Ton Prénom">
-        <input type="password" id="user-pass" placeholder="Mot de passe">
-        <button class="btn" onclick="login()">ENTRER DANS LA MAISON</button>
+        <input type="password" id="user-pass" placeholder="Ton Mot de passe">
+        <button class="btn" onclick="actionLogin()">ENTRER DANS LA MAISON</button>
     </div>
 
     <div id="main-view" class="hidden">
         <h2 id="welcome-txt">Salut !</h2>
-        <input type="text" id="group-name-input" placeholder="Nom du groupe">
-        <button class="btn" onclick="createGroup()">Créer ce groupe</button>
-        <div id="groups-container" style="margin-top:20px; color:#666; font-size:0.9em;">Chargement des groupes...</div>
+        <input type="text" id="group-name-input" placeholder="Nom du groupe à créer">
+        <button class="btn" onclick="actionCreateGroup()">Créer ce groupe</button>
+        <hr style="margin:20px 0; border:0; border-top:1px solid #eee;">
+        <div id="groups-container">Chargement des groupes...</div>
     </div>
 
     <div id="group-view" class="hidden">
-        <button onclick="showMain()" style="cursor:pointer; border:none; background:none; color:var(--red); font-weight:bold; float:left;">← Retour</button>
+        <button onclick="actionShowMain()" style="cursor:pointer; border:none; background:none; color:var(--red); font-weight:bold; float:left;">← Retour</button>
         <br><h2 id="current-group-name">Groupe</h2>
         <div id="participants-list" style="margin: 15px 0; font-style: italic; color:#666;"></div>
-        <button class="btn" onclick="joinGroup()" style="background:var(--green)">M'inscrire au tirage</button>
-        <button class="btn" onclick="revealSecret()" style="margin-top: 15px; background: #e67e22;">🎁 Voir ma cible</button>
+        <button class="btn" onclick="actionJoinGroup()" style="background:var(--green)">M'inscrire au tirage</button>
+        <button class="btn" onclick="actionRevealSecret()" style="margin-top: 15px; background: #e67e22;">🎁 Voir ma cible</button>
         <div id="result-display" style="font-weight:bold; color:var(--green); margin-top:15px"></div>
     </div>
 </div>
 
 <script>
-    // --- CONFIGURATION ---
-    const SURL = 'https://reeezxhcvsmcurodqxyw.supabase.co';
-    const SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeXl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1Mzc4MzIsImV4cCI6MjA1MDEwOTgzMn0.sV_S_nL6i915LIn5InV6eGhjdnN0Y3Vyb2RxeXl3';
+    // --- CONFIGURATION UNIQUE ---
+    const S_URL = 'https://reeezxhcvsmcurodqxyw.supabase.co';
+    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeXl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1Mzc4MzIsImV4cCI6MjA1MDEwOTgzMn0.sV_S_nL6i915LIn5InV6eGhjdnN0Y3Vyb2RxeXl3';
     
-    // On utilise "maConnexion" pour éviter le conflit avec le mot "supabase" réservé
-    const maConnexion = supabase.createClient(SURL, SKEY);
+    // On utilise un nom de variable unique pour éviter toute erreur
+    const db = supabase.createClient(S_URL, S_KEY);
 
-    let me = { name: "", pass: "" };
-    let currentGroupId = null;
+    let monPrenom = "";
+    let monPass = "";
+    let idGroupeActuel = null;
 
-    async function login() {
+    async function actionLogin() {
         const n = document.getElementById('user-name').value;
         const p = document.getElementById('user-pass').value;
-        if(!n || !p) return alert("Remplis tout !");
-        me = { name: n, pass: p };
+        if(!n || !p) return alert("Prénom et mot de passe requis !");
+        monPrenom = n;
+        monPass = p;
         document.getElementById('welcome-txt').innerText = "Salut " + n + " !";
         document.getElementById('login-view').classList.add('hidden');
         document.getElementById('main-view').classList.remove('hidden');
-        await loadGroups();
+        await actionLoadGroups();
     }
 
-    async function loadGroups() {
-        const { data, error } = await maConnexion.from('groups').select('*');
+    async function actionLoadGroups() {
+        const { data, error } = await db.from('groups').select('*');
         const container = document.getElementById('groups-container');
-        if(error) { container.innerText = "Erreur de connexion."; return; }
+        if(error) { container.innerText = "Erreur de base de données."; return; }
         container.innerHTML = (data && data.length) ? "" : "Aucun groupe créé.";
         if(data) data.forEach(g => {
-            container.innerHTML += `<div class="group-item"><span>${g.name}</span><button onclick="openGroup('${g.id}', '${g.name}')" style="background:var(--green); color:white; border:none; padding:8px; border-radius:5px; cursor:pointer">Entrer</button></div>`;
+            container.innerHTML += `<div class="group-item"><span>${g.name}</span><button onclick="actionOpenGroup('${g.id}', '${g.name}')" style="background:var(--green); color:white; border:none; padding:8px; border-radius:5px; cursor:pointer">Entrer</button></div>`;
         });
     }
 
-    async function createGroup() {
-        const name = document.getElementById('group-name-input').value;
-        if(!name) return;
-        const { error } = await maConnexion.from('groups').insert([{ name: name }]);
-        if(error) { alert("Erreur : Vérifie que le SQL a bien été lancé dans Supabase."); console.log(error); }
+    async function actionCreateGroup() {
+        const nom = document.getElementById('group-name-input').value;
+        if(!nom) return;
+        const { error } = await db.from('groups').insert([{ name: nom }]);
+        if(error) { alert("Erreur : " + error.message); return; }
         document.getElementById('group-name-input').value = "";
-        await loadGroups();
+        await actionLoadGroups();
     }
 
-    async function openGroup(id, name) {
-        currentGroupId = id;
+    async function actionOpenGroup(id, nom) {
+        idGroupeActuel = id;
         document.getElementById('main-view').classList.add('hidden');
         document.getElementById('group-view').classList.remove('hidden');
-        document.getElementById('current-group-name').innerText = name;
-        await loadParticipants();
+        document.getElementById('current-group-name').innerText = nom;
+        document.getElementById('result-display').innerText = "";
+        await actionLoadParticipants();
     }
 
-    function showMain() {
+    function actionShowMain() {
         document.getElementById('group-view').classList.add('hidden');
         document.getElementById('main-view').classList.remove('hidden');
-        loadGroups();
+        actionLoadGroups();
     }
 
-    async function joinGroup() {
-        const { error } = await maConnexion.from('participants').insert([{ group_id: currentGroupId, name: me.name, user_password: me.pass }]);
-        if(error) alert("Déjà inscrit ou erreur.");
-        await loadParticipants();
+    async function actionJoinGroup() {
+        const { error } = await db.from('participants').insert([{ 
+            group_id: idGroupeActuel, 
+            name: monPrenom, 
+            user_password: monPass 
+        }]);
+        if(error) alert("Tu es déjà inscrit ou il y a un problème.");
+        await actionLoadParticipants();
     }
 
-    async function loadParticipants() {
-        const { data } = await maConnexion.from('participants').select('name').eq('group_id', currentGroupId);
+    async function actionLoadParticipants() {
+        const { data } = await db.from('participants').select('name').eq('group_id', idGroupeActuel);
         document.getElementById('participants-list').innerText = "Inscrits : " + (data ? data.map(p => p.name).join(', ') : "");
     }
 
-    async function revealSecret() {
-        const { data } = await maConnexion.from('participants').select('*').eq('group_id', currentGroupId);
-        if(!data || data.length < 3) return alert("Besoin d'au moins 3 personnes !");
-        let list = data.map(p => p.name).sort();
-        let targets = [...list];
-        targets.push(targets.shift());
-        const idx = list.indexOf(me.name);
-        document.getElementById('result-display').innerText = idx !== -1 ? "Tu offres à : " + targets[idx] : "Inscris-toi d'abord !";
+    async function actionRevealSecret() {
+        const { data } = await db.from('participants').select('*').eq('group_id', idGroupeActuel);
+        if(!data || data.length < 3) return alert("Il faut au moins 3 inscrits !");
+        
+        const moi = data.find(p => p.name === monPrenom);
+        if(!moi) return alert("Inscris-toi d'abord !");
+        if(moi.user_password !== monPass) return alert("Mot de passe incorrect !");
+
+        let noms = data.map(p => p.name).sort();
+        let cibles = [...noms];
+        cibles.push(cibles.shift());
+        
+        const indexMoi = noms.indexOf(monPrenom);
+        document.getElementById('result-display').innerHTML = "Cadeau pour :<br>🎁 <strong>" + cibles[indexMoi] + "</strong> 🎁";
     }
 
-    // Effet Neige
+    // --- NEIGE ---
     const canvas = document.getElementById('snow');
     const ctx = canvas.getContext('2d');
     let flakes = [];
