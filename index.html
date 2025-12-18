@@ -3,139 +3,108 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Le Secret Santa de Noël</title>
+    <title>Noël Secret - Connexion</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root {
-            --red: #c0392b;
-            --green: #27ae60;
-            --gold: #f1c40f;
-            --snow: #ecf0f1;
-        }
-
-        body {
-            font-family: 'Georgia', serif;
-            background: #1a472a url('https://www.transparenttextures.com/patterns/snow.png');
-            color: var(--snow);
-            margin: 0; padding: 20px;
-            display: flex; justify-content: center;
-        }
-
-        .container {
-            background: rgba(255, 255, 255, 0.95);
-            color: #333;
-            padding: 30px;
-            border-radius: 15px;
-            width: 100%; max-width: 600px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            border: 5px solid var(--red);
-            text-align: center;
-        }
-
-        h1 { color: var(--red); font-size: 2.5em; margin-top: 0; }
-        .btn {
-            background: var(--red); color: white; border: none;
-            padding: 10px 20px; border-radius: 5px; cursor: pointer;
-            font-weight: bold; margin: 5px;
-        }
-        .btn-green { background: var(--green); }
-        
-        input {
-            padding: 10px; border: 2px solid #ddd; border-radius: 5px;
-            width: 70%; margin-bottom: 10px;
-        }
-
-        .group-card {
-            border: 1px solid #ddd; padding: 15px; margin: 10px 0;
-            border-radius: 10px; display: flex; justify-content: space-between;
-            align-items: center; background: white;
-        }
-
+        :root { --red: #b33939; --green: #218c74; --gold: #ccae62; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2c3e50; color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: white; color: #333; padding: 30px; border-radius: 15px; width: 350px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 4px solid var(--red); }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; text-transform: uppercase; margin-top: 10px; }
+        .btn-red { background: var(--red); color: white; }
+        .btn-green { background: var(--green); color: white; }
         .hidden { display: none; }
-        .santa-icon { font-size: 3em; }
+        .group-item { background: #f1f2f6; padding: 10px; margin: 10px 0; border-radius: 5px; display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div id="home-view">
-        <div class="santa-icon">🎅</div>
-        <h1>Les Groupes de Noël</h1>
-        
-        <div style="margin-bottom: 30px;">
-            <input type="text" id="new-group-name" placeholder="Nom du nouveau groupe...">
-            <button class="btn" onclick="createNewGroup()">Créer un groupe</button>
-        </div>
+<div class="card">
+    <div id="login-view">
+        <h1 style="color: var(--red);">🎅 Connexion</h1>
+        <input type="text" id="user-name" placeholder="Ton Prénom">
+        <input type="password" id="user-pass" placeholder="Mot de passe secret">
+        <button class="btn btn-red" onclick="login()">Entrer dans la Maison</button>
+    </div>
 
-        <div id="groups-list">
-            <p>Chargement des festivités...</p>
-        </div>
+    <div id="main-view" class="hidden">
+        <h2 id="welcome-txt">Salut !</h2>
+        <hr>
+        <h3>Créer un groupe</h3>
+        <input type="text" id="group-name-input" placeholder="Nom du groupe">
+        <button class="btn btn-red" onclick="createGroup()">Créer</button>
+        <hr>
+        <h3>Rejoindre un Secret Santa</h3>
+        <div id="groups-container">Chargement...</div>
     </div>
 
     <div id="group-view" class="hidden">
-        <button class="btn" onclick="showHome()" style="float: left;">← Retour</button>
-        <h1 id="current-group-title">Groupe</h1>
-        <p>Inscris-toi pour participer au tirage au sort !</p>
-        
-        <input type="text" id="player-name" placeholder="Ton prénom">
-        <button class="btn btn-green" onclick="joinGroup()">S'inscrire</button>
-
-        <div id="participants-list" style="margin: 20px 0; font-weight: bold;"></div>
-        
-        <hr>
-        <button class="btn" onclick="shuffleSecretSanta()">Lancer le tirage de Noël</button>
-        <div id="result-area" style="margin-top: 20px; font-size: 1.2em; color: var(--green);"></div>
+        <button onclick="showMain()" style="border:none; background:none; color:var(--red); cursor:pointer;">← Retour</button>
+        <h2 id="current-group-name">Groupe</h2>
+        <div id="participants-list" style="margin-bottom: 20px;"></div>
+        <button class="btn btn-green" onclick="joinGroup()">S'inscrire à ce tirage</button>
+        <button class="btn btn-red" onclick="revealSecret()" style="margin-top: 20px;">Voir mon tirage</button>
+        <p id="result-display" style="font-weight:bold; color:var(--green); margin-top:10px;"></p>
     </div>
 </div>
 
 <script>
-    // INITIALISATION SUPABASE
-    const supabaseUrl = 'https://reeezxhcvsmcurodqxyw.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNzMwOTAsImV4cCI6MjA4MTY0OTA5MH0.Vg8ZADo1X4P9c_Rhs21jGUMThhc9MbdD3ETLZS9EDhw';
+    // --- CONFIGURATION ---
+    const supabaseUrl = 'TON_URL_ICI';
+    const supabaseKey = 'TA_CLE_ANON_ICI';
     const supabase = supabase.createClient(supabaseUrl, supabaseKey);
 
+    let me = { name: "", pass: "" };
     let currentGroupId = null;
 
+    // --- LOGIQUE ---
+    function login() {
+        const name = document.getElementById('user-name').value;
+        const pass = document.getElementById('user-pass').value;
+        if(!name || !pass) return alert("Remplis tout !");
+        me = { name, pass };
+        document.getElementById('welcome-txt').innerText = "Salut " + name + " ! 🎄";
+        document.getElementById('login-view').classList.add('hidden');
+        document.getElementById('main-view').classList.remove('hidden');
+        loadGroups();
+    }
+
     async function loadGroups() {
-        const { data, error } = await supabase.from('groups').select('*').order('created_at', { ascending: false });
-        const listDiv = document.getElementById('groups-list');
-        listDiv.innerHTML = "";
+        const { data } = await supabase.from('groups').select('*');
+        const container = document.getElementById('groups-container');
+        container.innerHTML = "";
         data.forEach(g => {
-            listDiv.innerHTML += `
-                <div class="group-card">
-                    <span><strong>${g.name}</strong></span>
-                    <button class="btn btn-green" onclick="openGroup('${g.id}', '${g.name}')">Rejoindre</button>
-                </div>`;
+            container.innerHTML += `<div class="group-item">
+                <span>${g.name}</span>
+                <button class="btn btn-green" style="width:auto; padding:5px 10px;" onclick="openGroup('${g.id}', '${g.name}')">Entrer</button>
+            </div>`;
         });
     }
 
-    async function createNewGroup() {
-        const name = document.getElementById('new-group-name').value;
-        if (!name) return;
+    async function createGroup() {
+        const name = document.getElementById('group-name-input').value;
+        if(!name) return;
         await supabase.from('groups').insert([{ name }]);
-        document.getElementById('new-group-name').value = "";
+        document.getElementById('group-name-input').value = "";
         loadGroups();
     }
 
     async function openGroup(id, name) {
         currentGroupId = id;
-        document.getElementById('home-view').classList.add('hidden');
+        document.getElementById('main-view').classList.add('hidden');
         document.getElementById('group-view').classList.remove('hidden');
-        document.getElementById('current-group-title').innerText = name;
+        document.getElementById('current-group-name').innerText = name;
         loadParticipants();
     }
 
-    function showHome() {
-        document.getElementById('home-view').classList.remove('hidden');
+    function showMain() {
         document.getElementById('group-view').classList.add('hidden');
-        loadGroups();
+        document.getElementById('main-view').classList.remove('hidden');
     }
 
     async function joinGroup() {
-        const name = document.getElementById('player-name').value;
-        if (!name) return;
-        await supabase.from('participants').insert([{ group_id: currentGroupId, name }]);
-        document.getElementById('player-name').value = "";
+        const { error } = await supabase.from('participants').insert([{ group_id: currentGroupId, name: me.name }]);
+        if(error) alert("Déjà inscrit !");
         loadParticipants();
     }
 
@@ -144,30 +113,21 @@
         document.getElementById('participants-list').innerHTML = "Participants : " + data.map(p => p.name).join(', ');
     }
 
-    async function shuffleSecretSanta() {
-        const { data: participants } = await supabase.from('participants').select('*').eq('group_id', currentGroupId);
-        if (participants.length < 3) return alert("Il faut au moins 3 personnes !");
+    async function revealSecret() {
+        const { data } = await supabase.from('participants').select('name').eq('group_id', currentGroupId);
+        if(data.length < 3) return alert("Il faut au moins 3 personnes !");
 
-        let names = participants.map(p => p.name);
-        let shuffled = [...names];
+        // Algorithme de tirage (basé sur le nom de l'utilisateur)
+        let participants = data.map(p => p.name).sort();
+        let shuffled = [...participants];
+        // On utilise une graine fixe pour que le tirage soit le même pour tout le monde
+        shuffled.push(shuffled.shift()); 
+
+        const myIndex = participants.indexOf(me.name);
+        if(myIndex === -1) return alert("Inscris-toi d'abord !");
         
-        // Tirage au sort
-        let valid = false;
-        while (!valid) {
-            shuffled.sort(() => Math.random() - 0.5);
-            valid = participants.every((p, i) => p.name !== shuffled[i]);
-        }
-
-        const myName = prompt("Entrez votre prénom pour voir votre cible :");
-        const index = names.indexOf(myName);
-        if (index !== -1) {
-            document.getElementById('result-area').innerHTML = `🎄 🎁 Tu dois faire un cadeau à : <strong>${shuffled[index]}</strong>`;
-        } else {
-            alert("Tu n'es pas dans la liste !");
-        }
+        document.getElementById('result-display').innerText = "🎁 Tu dois offrir à : " + shuffled[myIndex];
     }
-
-    loadGroups();
 </script>
 </body>
 </html>
