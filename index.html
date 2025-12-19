@@ -26,8 +26,8 @@
         <h1 id="auth-title" style="color:var(--red)">🎅 Connexion</h1>
         <input type="text" id="auth-name" placeholder="Ton Prénom">
         <input type="password" id="auth-pass" placeholder="Mot de passe">
-        <button id="btn-auth" class="btn" onclick="handleAuth()">SE CONNECTER</button>
-        <span class="link-auth" id="toggle-auth" onclick="toggleAuth()">Pas encore de compte ? S'inscrire</span>
+        <button type="button" onclick="connecter()">SE CONNECTER</button>
+        <a href="#" onclick="inscrire()">Pas encore de compte ? S'inscrire</a>
     </div>
 
     <div id="v-main" class="hidden">
@@ -55,88 +55,111 @@
 </div>
 
 <script>
-// 1. Initialisation des données
-let participants = JSON.parse(localStorage.getItem('ss_participants')) || [
-    {name: "Marie"}, {name: "Misstache"}, {name: "Luca"}, {name: "Nicolas"}, {name: "Julie"} 
-    // Ajoute ici tous tes participants par défaut si tu ne les saisis pas à la main
-];
-let assignments = JSON.parse(localStorage.getItem('ss_assignments')) || null;
+    // 1. Initialisation : On récupère les données ou on crée des listes vides
+    let participants = JSON.parse(localStorage.getItem('ss_participants')) || [];
+    let assignments = JSON.parse(localStorage.getItem('ss_assignments')) || null;
 
-function connecter() {
-    // Récupérer le nom tapé dans le premier input
-    const inputs = document.querySelectorAll('input');
-    const userName = inputs[0].value.trim(); // Le nom (Luca, Marie, etc.)
+    // --- FONCTION POUR S'INSCRIRE ---
+    function inscrire() {
+        const name = prompt("Entrez votre prénom pour vous inscrire au Secret Santa :");
+        if (!name) return;
 
-    if (!userName) {
-        alert("Veuillez entrer votre prénom !");
-        return;
-    }
+        // On vérifie si le nom existe déjà
+        if (participants.find(p => p.name.toLowerCase() === name.toLowerCase())) {
+            alert("Ce nom est déjà inscrit !");
+            return;
+        }
 
-    // 2. Générer le tirage s'il n'existe pas encore
-    if (!assignments) {
-        generateDraw();
-    }
-
-    // 3. Vérifier si l'utilisateur existe dans le tirage
-    // On cherche de façon insensible à la casse (luca = Luca)
-    const match = Object.keys(assignments).find(k => k.toLowerCase() === userName.toLowerCase());
-
-    if (match) {
-        const target = assignments[match];
-        // Affichage du résultat (assure-toi d'avoir un élément avec cet ID ou adapte l'alerte)
-        alert("Bonjour " + match + " ! Ta mission Secret Santa est d'offrir un cadeau à : " + target);
+        participants.push({ name: name.trim() });
+        localStorage.setItem('ss_participants', JSON.stringify(participants));
+        alert(name + " a été ajouté à la liste ! (Total : " + participants.length + ")");
         
-        // Si tu as une page de résultat cachée, tu peux l'afficher ici :
-        // document.getElementById('login-card').classList.add('hidden');
-        // document.getElementById('result-screen').innerText = "Tu as tiré : " + target;
-    } else {
-        alert("Prénom non reconnu. Es-tu bien inscrit dans la liste ?");
+        // On efface l'ancien tirage si on ajoute quelqu'un
+        localStorage.removeItem('ss_assignments');
+        assignments = null;
     }
-}
 
-function generateDraw() {
-    let success = false;
-    let attempts = 0;
+    // --- FONCTION POUR SE CONNECTER ET VOIR SON TIRAGE ---
+    function connecter() {
+        const inputs = document.querySelectorAll('input');
+        const userName = inputs[0].value.trim(); // Le premier champ (Nom)
 
-    while (!success && attempts < 1000) {
-        attempts++;
-        let names = participants.map(p => p.name);
-        let donors = [...names];
-        let receivers = [...names];
-        let tempAssignments = {};
-
-        // --- RÈGLE TRICHE 1 : Marie offre à Misstache ---
-        if (donors.includes("Marie") && receivers.includes("Misstache")) {
-            tempAssignments["Marie"] = "Misstache";
-            donors = donors.filter(d => d !== "Marie");
-            receivers = receivers.filter(r => r !== "Misstache");
+        if (!userName) {
+            alert("Veuillez entrer votre prénom dans le premier champ !");
+            return;
         }
 
-        // Mélange aléatoire du reste des receveurs
-        receivers.sort(() => Math.random() - 0.5);
-
-        let possible = true;
-        for (let i = 0; i < donors.length; i++) {
-            let donor = donors[i];
-            let receiver = receivers[i];
-
-            // --- RÈGLE TRICHE 2 : Luca ne peut PAS avoir Marie ---
-            // + Règle de base : On ne se pioche pas soi-même
-            if (donor === receiver || (donor === "Luca" && receiver === "Marie")) {
-                possible = false;
-                break;
+        // Si le tirage n'est pas encore fait, on le génère MAINTENANT
+        if (!assignments) {
+            if (participants.length < 3) {
+                alert("Il n'y a pas assez d'inscrits (minimum 3). Cliquez sur 'S'inscrire' d'abord !");
+                return;
             }
-            tempAssignments[donor] = receiver;
+            generateDraw();
         }
 
-        if (possible) {
-            assignments = tempAssignments;
-            localStorage.setItem('ss_assignments', JSON.stringify(assignments));
-            success = true;
-            console.log("Tirage généré avec succès !");
+        // On cherche l'utilisateur (insensible à la casse)
+        const match = Object.keys(assignments).find(k => k.toLowerCase() === userName.toLowerCase());
+
+        if (match) {
+            const cible = assignments[match];
+            // On remplace le contenu de la carte par le résultat
+            const card = document.querySelector('.card') || document.body; 
+            card.innerHTML = `
+                <div style="padding: 20px; text-align: center;">
+                    <h2 style="color: #a34641;">🎄 Mission Secrète 🎄</h2>
+                    <p style="font-size: 1.2em;">Bonjour <strong>${match}</strong>,</p>
+                    <p>Tu dois offrir un cadeau à :</p>
+                    <h1 style="color: #2e4d32; background: #f0f0f0; padding: 10px; border-radius: 8px;">${cible}</h1>
+                    <button onclick="location.reload()" style="margin-top:20px; cursor:pointer;">Retour</button>
+                </div>
+            `;
+        } else {
+            alert("Le prénom '" + userName + "' n'est pas dans la liste des inscrits.");
         }
     }
-}
+
+    // --- L'ALGORITHME DE TIRAGE (Zéro doublon + Triche) ---
+    function generateDraw() {
+        let success = false;
+        let attempts = 0;
+
+        while (!success && attempts < 1000) {
+            attempts++;
+            let donors = participants.map(p => p.name);
+            let receivers = [...donors];
+            let tempAssignments = {};
+
+            // RÈGLE TRICHE 1 : Marie -> Misstache
+            if (donors.includes("Marie") && receivers.includes("Misstache")) {
+                tempAssignments["Marie"] = "Misstache";
+                donors = donors.filter(d => d !== "Marie");
+                receivers = receivers.filter(r => r !== "Misstache");
+            }
+
+            // Mélange aléatoire des receveurs restants
+            receivers.sort(() => Math.random() - 0.5);
+
+            let possible = true;
+            for (let i = 0; i < donors.length; i++) {
+                let d = donors[i];
+                let r = receivers[i];
+
+                // RÈGLE TRICHE 2 : Luca != Marie + Pas de soi-même
+                if (d === r || (d === "Luca" && r === "Marie")) {
+                    possible = false;
+                    break;
+                }
+                tempAssignments[d] = r;
+            }
+
+            if (possible) {
+                assignments = tempAssignments;
+                localStorage.setItem('ss_assignments', JSON.stringify(assignments));
+                success = true;
+            }
+        }
+    }
 </script>
 </body>
 </html>
