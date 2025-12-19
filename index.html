@@ -55,114 +55,88 @@
 </div>
 
 <script>
-    // Chargement des données sauvegardées
-    let participants = JSON.parse(localStorage.getItem('ss_participants')) || [];
-    let assignments = JSON.parse(localStorage.getItem('ss_assignments')) || null;
+// 1. Initialisation des données
+let participants = JSON.parse(localStorage.getItem('ss_participants')) || [
+    {name: "Marie"}, {name: "Misstache"}, {name: "Luca"}, {name: "Nicolas"}, {name: "Julie"} 
+    // Ajoute ici tous tes participants par défaut si tu ne les saisis pas à la main
+];
+let assignments = JSON.parse(localStorage.getItem('ss_assignments')) || null;
 
-    // Mise à jour de l'affichage au démarrage
-    window.onload = function() {
-        if (participants.length > 0) {
-            updateList();
-            document.getElementById('setup-step').classList.add('hidden');
-            document.getElementById('join-step').classList.remove('hidden');
-        }
-    };
+function connecter() {
+    // Récupérer le nom tapé dans le premier input
+    const inputs = document.querySelectorAll('input');
+    const userName = inputs[0].value.trim(); // Le nom (Luca, Marie, etc.)
 
-    function addPlayer() {
-        const input = document.getElementById('player-name');
-        const name = input.value.trim();
-        if(name && !participants.find(p => p.name === name)) {
-            participants.push({name: name});
-            localStorage.setItem('ss_participants', JSON.stringify(participants));
-            input.value = "";
-            updateList();
-        }
+    if (!userName) {
+        alert("Veuillez entrer votre prénom !");
+        return;
     }
 
-    function updateList() {
-        const listDiv = document.getElementById('participant-list');
-        listDiv.innerHTML = participants.map(p => `<span class="participant-tag">${p.name}</span>`).join('');
+    // 2. Générer le tirage s'il n'existe pas encore
+    if (!assignments) {
+        generateDraw();
     }
 
-    function revealTargets() {
-        // 1. SI LE TIRAGE N'A PAS ENCORE ÉTÉ FAIT
-        if (!assignments) {
-            if (participants.length < 3) {
-                alert("Il faut au moins 3 personnes pour commencer !");
-                return;
-            }
+    // 3. Vérifier si l'utilisateur existe dans le tirage
+    // On cherche de façon insensible à la casse (luca = Luca)
+    const match = Object.keys(assignments).find(k => k.toLowerCase() === userName.toLowerCase());
 
-            let success = false;
-            let attempts = 0;
-
-            while (!success && attempts < 500) {
-                attempts++;
-                let names = participants.map(p => p.name);
-                let donors = [...names];
-                let receivers = [...names];
-                let tempAssignments = {};
-
-                // --- LOGIQUE DE TRICHE ---
-                // Marie offre à Misstache
-                if (donors.includes("Marie") && receivers.includes("Misstache")) {
-                    tempAssignments["Marie"] = "Misstache";
-                    donors = donors.filter(d => d !== "Marie");
-                    receivers = receivers.filter(r => r !== "Misstache");
-                }
-
-                // Mélange aléatoire du reste
-                receivers.sort(() => Math.random() - 0.5);
-
-                let possible = true;
-                for (let i = 0; i < donors.length; i++) {
-                    let donor = donors[i];
-                    let receiver = receivers[i];
-
-                    // CONTRAINTES : 
-                    // 1. Pas soi-même
-                    // 2. Luca ne peut pas avoir Marie
-                    if (donor === receiver || (donor === "Luca" && receiver === "Marie")) {
-                        possible = false;
-                        break;
-                    }
-                    tempAssignments[donor] = receiver;
-                }
-
-                if (possible) {
-                    assignments = tempAssignments;
-                    localStorage.setItem('ss_assignments', JSON.stringify(assignments));
-                    success = true;
-                }
-            }
-
-            if (!success) {
-                alert("Erreur : Impossible de respecter les règles (Marie/Luca). Essayez d'ajouter plus de monde.");
-                return;
-            }
-        }
-
-        // 2. IDENTIFICATION DE L'UTILISATEUR
-        const userSideName = prompt("Entrez votre prénom EXACT (attention aux majuscules) :");
-        if (!userSideName) return;
-
-        // On cherche le nom dans les clés (insensible à la casse)
-        const match = Object.keys(assignments).find(k => k.toLowerCase() === userSideName.toLowerCase().trim());
+    if (match) {
+        const target = assignments[match];
+        // Affichage du résultat (assure-toi d'avoir un élément avec cet ID ou adapte l'alerte)
+        alert("Bonjour " + match + " ! Ta mission Secret Santa est d'offrir un cadeau à : " + target);
         
-        if (match) {
-            document.getElementById('join-step').classList.add('hidden');
-            document.getElementById('reveal-step').classList.remove('hidden');
-            document.getElementById('personal-assignment').innerText = `Ta mission : Offrir un cadeau à ${assignments[match]} !`;
-        } else {
-            alert(`Le prénom "${userSideName}" n'est pas dans la liste des participants.`);
-        }
+        // Si tu as une page de résultat cachée, tu peux l'afficher ici :
+        // document.getElementById('login-card').classList.add('hidden');
+        // document.getElementById('result-screen').innerText = "Tu as tiré : " + target;
+    } else {
+        alert("Prénom non reconnu. Es-tu bien inscrit dans la liste ?");
     }
+}
 
-    function resetAll() {
-        if(confirm("Attention : cela va supprimer tout le tirage actuel ! Continuer ?")) {
-            localStorage.clear();
-            location.reload();
+function generateDraw() {
+    let success = false;
+    let attempts = 0;
+
+    while (!success && attempts < 1000) {
+        attempts++;
+        let names = participants.map(p => p.name);
+        let donors = [...names];
+        let receivers = [...names];
+        let tempAssignments = {};
+
+        // --- RÈGLE TRICHE 1 : Marie offre à Misstache ---
+        if (donors.includes("Marie") && receivers.includes("Misstache")) {
+            tempAssignments["Marie"] = "Misstache";
+            donors = donors.filter(d => d !== "Marie");
+            receivers = receivers.filter(r => r !== "Misstache");
+        }
+
+        // Mélange aléatoire du reste des receveurs
+        receivers.sort(() => Math.random() - 0.5);
+
+        let possible = true;
+        for (let i = 0; i < donors.length; i++) {
+            let donor = donors[i];
+            let receiver = receivers[i];
+
+            // --- RÈGLE TRICHE 2 : Luca ne peut PAS avoir Marie ---
+            // + Règle de base : On ne se pioche pas soi-même
+            if (donor === receiver || (donor === "Luca" && receiver === "Marie")) {
+                possible = false;
+                break;
+            }
+            tempAssignments[donor] = receiver;
+        }
+
+        if (possible) {
+            assignments = tempAssignments;
+            localStorage.setItem('ss_assignments', JSON.stringify(assignments));
+            success = true;
+            console.log("Tirage généré avec succès !");
         }
     }
+}
 </script>
 </body>
 </html>
