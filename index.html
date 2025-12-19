@@ -55,164 +55,127 @@
 </div>
 
 <script>
-    // --- CONFIGURATION ---
-    const S_URL = 'https://reeezxhcvsmcurodqxyw.supabase.co';
-    const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNzMwOTAsImV4cCI6MjA4MTY0OTA5MH0.Vg8ZADo1X4P9c_Rhs21jGUMThhc9MbdD3ETLZS9EDhw';
-    const sb = supabase.createClient(S_URL, S_KEY);
+    let participants = JSON.parse(localStorage.getItem('ss_participants')) || [];
+    let groupName = localStorage.getItem('ss_groupname') || "";
+    // On récupère le tirage s'il a déjà été fait
+    let assignments = JSON.parse(localStorage.getItem('ss_assignments')) || null;
 
-    let isLoginMode = true;
-    let user = { name: "" };
-    let activeGroup = { id: null, limit: 0 };
-
-    function toggleAuth() {
-        isLoginMode = !isLoginMode;
-        document.getElementById('auth-title').innerText = isLoginMode ? "🎅 Connexion" : "🎅 Inscription";
-        document.getElementById('btn-auth').innerText = isLoginMode ? "SE CONNECTER" : "S'INSCRIRE";
-        document.getElementById('toggle-auth').innerText = isLoginMode ? "Pas encore de compte ? S'inscrire" : "Déjà un compte ? Se connecter";
+    if(groupName) {
+        showJoinStep();
     }
 
-async function handleAuth() {
-    const n = document.getElementById('auth-name').value.trim();
-    const p = document.getElementById('auth-pass').value.trim();
-    if(!n || !p) return alert("Remplis tout !");
-
-    console.log("Tentative avec :", n);
-
-    if (isLoginMode) {
-        const { data, error } = await sb.from('profiles').select('*').eq('name', n).eq('password', p).single();
-        if (error) {
-            console.error("Erreur Connexion:", error);
-            return alert("Erreur : " + error.message);
+    function createGroup() {
+        const name = document.getElementById('group-name').value;
+        if(name) {
+            groupName = name;
+            localStorage.setItem('ss_groupname', name);
+            showJoinStep();
         }
-        enterApp(n);
+    }
+
+    function showJoinStep() {
+        document.getElementById('setup-step').classList.add('hidden');
+        document.getElementById('join-step').classList.remove('hidden');
+        document.getElementById('display-group-name').innerText = groupName;
+        updateList();
+        if(participants.length >= 3) {
+            document.getElementById('admin-zone').classList.remove('hidden');
+        }
+    }
+
+    function addPlayer() {
+        const name = document.getElementById('player-name').value;
+        if(name && !participants.find(p => p.name === name)) {
+            participants.push({name: name});
+            localStorage.setItem('ss_participants', JSON.stringify(participants));
+            document.getElementById('player-name').value = "";
+            updateList();
+            if(participants.length >= 3) document.getElementById('admin-zone').classList.remove('hidden');
+        }
+    }
+
+    function updateList() {
+        const listDiv = document.getElementById('participant-list');
+        listDiv.innerHTML = participants.map(p => `<span class="participant-tag">${p.name}</span>`).join('');
+    }
+
+function revealTargets() {
+    // 1. Si le tirage n'a jamais été fait, on le génère avec les règles de triche
+    if (!assignments) {
+        let success = false;
+        let attempts = 0;
+
+        while (!success && attempts < 500) {
+            let names = participants.map(p => p.name);
+            let pool = [...names];
+            let currentAssignments = {};
+
+            // --- PARTIE TRICHE ---
+            // Règle 1 : Marie -> Misstache
+            if (names.includes("Marie") && pool.includes("Misstache")) {
+                currentAssignments["Marie"] = "Misstache";
+                // On retire Marie des donneurs et Misstache des receveurs
+                names = names.filter(n => n !== "Marie");
+                pool = pool.filter(n => n !== "Misstache");
+            }
+
+            // Mélange du reste du chapeau (Fisher-Yates)
+            for (let i = pool.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [pool[i], pool[j]] = [pool[j], pool[i]];
+            }
+
+            // Distribution du reste avec vérification des contraintes
+            success = names.every((donor, index) => {
+                let target = pool[index];
+                
+                // Règle 2 : Luca ne doit PAS avoir Marie
+                if (donor === "Luca" && target === "Marie") return false;
+                
+                // Règle de base : On ne s'offre pas à soi-même
+                if (donor === target) return false;
+
+                currentAssignments[donor] = target;
+                return true;
+            });
+
+            if (success) {
+                assignments = currentAssignments;
+                localStorage.setItem('ss_assignments', JSON.stringify(assignments));
+            }
+            attempts++;
+        }
+        
+        if (!success) {
+            alert("Impossible de générer un tirage avec ces contraintes. Ajoutez plus de participants !");
+            return;
+        }
+    }
+
+    // 2. Affichage du résultat
+    const userSideName = prompt("Entrez votre prénom :");
+    if (!userSideName) return;
+
+    // On normalise le nom (enlève espaces et casse) pour éviter les erreurs de frappe
+    const key = Object.keys(assignments).find(k => k.toLowerCase().trim() === userSideName.toLowerCase().trim());
+    const target = assignments[key];
+    
+    if (target) {
+        document.getElementById('join-step').classList.add('hidden');
+        document.getElementById('reveal-step').classList.remove('hidden');
+        document.getElementById('personal-assignment').innerText = `Ta mission : Offrir un cadeau à ${target}`;
     } else {
-        const { data, error } = await sb.from('profiles').insert([{ name: n, password: p }]);
-        if (error) {
-            console.error("Erreur Inscription:", error);
-            // Si l'erreur est 401 ici, c'est ta clé S_KEY qui est fausse
-            return alert("Erreur Supabase ("+error.code+"): " + error.message);
-        }
-        alert("Compte créé ! Tu peux maintenant te connecter.");
-        toggleAuth();
+        alert("Prénom non trouvé. Assurez-vous d'être bien inscrit !");
     }
 }
 
-    function enterApp(name) {
-        user.name = name;
-        document.getElementById('welcome-msg').innerText = "Salut " + name + " ! 🎄";
-        document.getElementById('v-auth').classList.add('hidden');
-        document.getElementById('v-main').classList.remove('hidden');
-        loadGroups();
-    }
-
-    // --- LOGIQUE GROUPES ---
-    async function loadGroups() {
-        const { data } = await sb.from('groups').select('*');
-        const cont = document.getElementById('groups-list');
-        cont.innerHTML = (data && data.length) ? "" : "Aucun groupe créé.";
-        if(data) data.forEach(g => {
-            cont.innerHTML += `<div class="group-item"><span><strong>${g.name}</strong> (${g.max_slots} pers.)</span><button class="btn" style="width:auto; margin:0; padding:5px 10px; background:var(--green);" onclick="openGroup('${g.id}', '${g.name}', ${g.max_slots})">Entrer</button></div>`;
-        });
-    }
-
-    async function appCreateGroup() {
-        const name = document.getElementById('new-g-name').value;
-        const limit = document.getElementById('new-g-limit').value;
-        if(!name || limit < 3) return alert("Nom valide et minimum 3 personnes !");
-        const { error } = await sb.from('groups').insert([{ name: name, max_slots: limit }]);
-        if(error) alert("Ce nom de groupe existe déjà.");
-        else { document.getElementById('new-g-name').value = ""; loadGroups(); }
-    }
-
-    async function openGroup(id, name, limit) {
-        activeGroup = { id, name, limit };
-        document.getElementById('v-main').classList.add('hidden');
-        document.getElementById('v-group').classList.remove('hidden');
-        document.getElementById('cur-g-title').innerText = name;
-        loadParticipants();
-    }
-
-    function showMain() {
-        document.getElementById('v-group').classList.add('hidden');
-        document.getElementById('v-main').classList.remove('hidden');
-        loadGroups();
-    }
-
-    async function loadParticipants() {
-        const { data } = await sb.from('memberships').select('profile_name').eq('group_id', activeGroup.id);
-        const count = data ? data.length : 0;
-        document.getElementById('cur-g-info').innerText = `Participants : ${count} / ${activeGroup.limit}`;
-        document.getElementById('participants-list').innerText = "Inscrits : " + (data ? data.map(m => m.profile_name).join(', ') : "");
-        if(count >= activeGroup.limit) {
-            document.getElementById('btn-join').classList.add('hidden');
-            document.getElementById('reveal-zone').classList.remove('hidden');
-        } else {
-            document.getElementById('btn-join').classList.remove('hidden');
-            document.getElementById('reveal-zone').classList.add('hidden');
+    // Pour recommencer à zéro si besoin
+    function resetAll() {
+        if(confirm("Voulez-vous supprimer tout le groupe et le tirage ?")) {
+            localStorage.clear();
+            location.reload();
         }
     }
-
-    async function appJoinGroup() {
-        const { error } = await sb.from('memberships').insert([{ group_id: activeGroup.id, profile_name: user.name }]);
-        if(error) alert("Erreur (groupe plein ou tu es déjà inscrit).");
-        loadParticipants();
-    }
-
-async function appReveal() {
-    // 1. Récupération des participants
-    const { data } = await sb.from('memberships').select('profile_name').eq('group_id', activeGroup.id);
-    if(!data || data.length < 3) return alert("Il faut au moins 3 participants !");
-
-    const allNames = data.map(m => m.profile_name).sort(); // Trié pour que le tirage soit le même pour tous
-    const marieName = allNames.find(n => n.toLowerCase() === "marie");
-    const misstacheName = allNames.find(n => n.toLowerCase() === "misstache");
-
-    let finalTarget = "";
-
-    // --- LOGIQUE DE TIRAGE AVEC MISSIONS ---
-    if (marieName && misstacheName) {
-        if (user.name.toLowerCase() === "marie") {
-            // MISSION 1 : Marie offre TOUJOURS à Misstache
-            finalTarget = misstacheName;
-        } else {
-            // Pour tous les autres : on crée un tirage où Misstache n'est pas une cible
-            // et Marie n'est pas un donneur (car elle a déjà sa cible).
-            const givers = allNames.filter(n => n.toLowerCase() !== "marie");
-            const receivers = allNames.filter(n => n.toLowerCase() !== "misstache");
-
-            const myIdx = givers.indexOf(user.name);
-            // Décalage circulaire simple sur les listes réduites
-            finalTarget = receivers[(myIdx + 1) % receivers.length];
-
-            // MISSION 2 : Luca ne doit PAS tomber sur Marie
-            if (user.name.toLowerCase() === "luca" && finalTarget.toLowerCase() === "marie") {
-                // Si Luca tombe sur Marie, on lui donne la personne suivante dans la liste des receveurs
-                finalTarget = receivers[(myIdx + 2) % receivers.length];
-            }
-            
-            // SÉCURITÉ : Anti-auto-tirage (X ne peut pas s'offrir à X)
-            if (finalTarget === user.name) {
-                finalTarget = receivers[(myIdx + 2) % receivers.length];
-            }
-        }
-    } else {
-        // Tirage classique si Marie ou Misstache ne sont pas dans le groupe
-        let list = [...allNames];
-        let targets = [...list];
-        targets.push(targets.shift());
-        finalTarget = targets[list.indexOf(user.name)];
-    }
-
-    // Affichage
-    document.getElementById('res-target').innerHTML = "🎁 Ta mission : Offrir à <br><span style='font-size:1.5em; color:var(--red)'>" + finalTarget + "</span>";
-}
-
-    // --- NEIGE ---
-    const canvas = document.getElementById('snow'); const ctx = canvas.getContext('2d');
-    let flakes = [];
-    function init() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; flakes = []; for(let i=0; i<100; i++) flakes.push({x: Math.random()*canvas.width, y: Math.random()*canvas.height, r: Math.random()*3+1, d: Math.random()+0.5}); }
-    function draw() { ctx.clearRect(0,0,canvas.width,canvas.height); ctx.fillStyle = "white"; ctx.beginPath(); flakes.forEach(f => { ctx.moveTo(f.x, f.y); ctx.arc(f.x, f.y, f.r, 0, Math.PI*2); f.y += f.d; if(f.y > canvas.height) f.y = -10; }); ctx.fill(); requestAnimationFrame(draw); }
-    init(); draw();
 </script>
 </body>
 </html>
