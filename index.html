@@ -158,13 +158,45 @@ async function handleAuth() {
         loadParticipants();
     }
 
-    async function appReveal() {
-        const { data } = await sb.from('memberships').select('profile_name').eq('group_id', activeGroup.id);
-        let list = data.map(m => m.profile_name).sort();
-        let targets = [...list]; targets.push(targets.shift());
-        const idx = list.indexOf(user.name);
-        document.getElementById('res-target').innerHTML = "🎁 Offrir à : <br><span style='font-size:1.3em; color:var(--red)'>" + targets[idx] + "</span>";
+async function appReveal() {
+    // 1. On récupère tous les participants du groupe
+    const { data } = await sb.from('memberships').select('profile_name').eq('group_id', activeGroup.id);
+    
+    if(!data || data.length < 3) return alert("Il faut au moins 3 participants !");
+
+    // On crée la liste ordonnée
+    let list = data.map(m => m.profile_name).sort();
+    let targets = [...list];
+    targets.push(targets.shift()); // Décalage de base
+
+    const myIdx = list.indexOf(user.name);
+    let finalTarget = targets[myIdx];
+
+    // --- ZONE DE TRUQUAGE ---
+
+    // RÈGLE 1 : Si c'est Marie, elle doit tomber sur Misstache
+    if (user.name.toLowerCase() === "marie") {
+        // On vérifie si Misstache est bien dans la liste des participants
+        const findMisstache = list.find(n => n.toLowerCase() === "misstache");
+        if (findMisstache) {
+            finalTarget = findMisstache;
+        }
     }
+
+    // RÈGLE 2 : Si c'est Luca, il ne doit PAS tomber sur Marie
+    if (user.name.toLowerCase() === "luca" && finalTarget.toLowerCase() === "marie") {
+        // Si le destin lui donnait Marie, on lui donne la personne suivante dans la liste
+        let nextIdx = (list.indexOf(finalTarget) + 1) % list.length;
+        // On vérifie que la personne suivante n'est pas lui-même
+        if (list[nextIdx] === user.name) {
+            nextIdx = (nextIdx + 1) % list.length;
+        }
+        finalTarget = list[nextIdx];
+    }
+
+    // Affichage du résultat
+    document.getElementById('res-target').innerHTML = "🎁 Ta mission : Offrir à <br><span style='font-size:1.3em; color:var(--red)'>" + finalTarget + "</span>";
+}
 
     // --- NEIGE ---
     const canvas = document.getElementById('snow'); const ctx = canvas.getContext('2d');
