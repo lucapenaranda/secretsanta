@@ -2,147 +2,217 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Secret Santa 🎅</title>
+    <title>Secret Santa Pro - Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { background-color: #1a3020; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .card { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); width: 350px; text-align: center; border: 4px solid #a34641; }
-        h1 { color: #a34641; margin-bottom: 1.5rem; }
-        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; background: #f9faff; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; margin-top: 10px; }
-        .btn-connect { background-color: #a34641; color: white; }
-        .btn-connect:hover { background-color: #823531; }
-        .link-inscription { color: #a34641; font-size: 0.9rem; text-decoration: underline; cursor: pointer; display: block; margin-top: 15px; }
-        .result-box { background: #f0f0f0; padding: 15px; border-radius: 8px; margin-top: 20px; display: none; }
-        .result-name { font-size: 1.5rem; color: #2e4d32; font-weight: bold; }
+        /* Garde ton design actuel ici, j'ajoute juste les sections nécessaires */
+        .hidden { display: none; }
+        .card { max-width: 400px; margin: auto; padding: 20px; border: 2px solid #a34641; border-radius: 10px; }
+        input, button { width: 100%; margin: 5px 0; padding: 10px; }
     </style>
 </head>
 <body>
 
-<div class="card" id="main-card">
-    <h1 id="title">🎅 Connexion</h1>
-    
-    <div id="login-form">
-        <input type="text" id="login-username" placeholder="Ton Prénom (ex: Luca)">
-        <input type="password" id="login-pass" placeholder="Mot de passe (facultatif)">
-        <button class="btn-connect" onclick="tenterConnexion()">SE CONNECTER</button>
-        <span class="link-inscription" onclick="ouvrirInscription()">Pas encore de compte ? S'inscrire</span>
+<div class="card">
+    <h1 id="main-title">🎄 Secret Santa</h1>
+
+    <div id="auth-section">
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Mot de passe">
+        <button onclick="signUp()">S'INSCRIRE</button>
+        <button onclick="signIn()" style="background: #a34641; color: white;">SE CONNECTER</button>
     </div>
 
-    <div id="result-area" class="result-box">
-        <p>Ta mission Secret Santa :</p>
-        <div class="result-name" id="target-name">...</div>
-        <button onclick="window.location.reload()">Retour</button>
+    <div id="group-section" class="hidden">
+        <h3>Bienvenue <span id="user-display"></span></h3>
+        <button onclick="showCreateGroup()">Créer un nouveau groupe</button>
+        <hr>
+        <h4>Rejoindre un groupe existant</h4>
+        <div id="available-groups"></div>
+    </div>
+
+    <div id="dashboard-section" class="hidden">
+        <h3 id="group-name-display"></h3>
+        <p id="participant-count"></p>
+        <div id="member-list"></div>
+        <button id="btn-reveal" class="hidden" onclick="revealTarget()" style="background: green; color: white;">VOIR MA CIBLE</button>
+        <p id="target-display" style="font-weight: bold; font-size: 1.5em; color: #a34641;"></p>
     </div>
 </div>
 
 <script>
-    // --- 1. CONFIGURATION ET DONNÉES ---
-    // Les participants enregistrés (Simule une base de données locale)
-    let participants = JSON.parse(localStorage.getItem('santa_players')) || [];
-    // Le tirage final (Une fois généré, il ne bouge plus)
-    let finalDraw = JSON.parse(localStorage.getItem('santa_draw')) || null;
+    // --- CONFIGURATION SUPABASE ---
+    const SUPABASE_URL = "https://reeezxhcvsmcurodqxyw.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlZWV6eGhjdnNtY3Vyb2RxeHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwNzMwOTAsImV4cCI6MjA4MTY0OTA5MH0.Vg8ZADo1X4P9c_Rhs21jGUMThhc9MbdD3ETLZS9EDhw";
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // --- 2. GESTION DE L'INSCRIPTION ---
-    function ouvrirInscription() {
-        const nom = prompt("Entrez votre prénom pour l'inscription :");
-        if (!nom) return;
-        
-        const nomPropre = nom.trim();
-        if (participants.includes(nomPropre)) {
-            alert("Ce nom est déjà inscrit !");
-        } else {
-            participants.push(nomPropre);
-            localStorage.setItem('santa_players', JSON.stringify(participants));
-            alert(nomPropre + " est inscrit !");
-            // On réinitialise le tirage si quelqu'un de nouveau arrive
-            localStorage.removeItem('santa_draw');
-            finalDraw = null;
+    let currentUser = null;
+    let currentGroupId = null;
+
+    // --- 1. AUTHENTIFICATION ---
+    async function signUp() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) alert(error.message); else alert("Vérifie tes emails !");
+    }
+
+    async function signIn() {
+        const email = document.getElementById('email').value;
+        const password = document.getElementById('password').value;
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) alert(error.message);
+        else {
+            currentUser = data.user;
+            showGroups();
         }
     }
 
-    // --- 3. LOGIQUE DE CONNEXION ET TIRAGE ---
-    function tenterConnexion() {
-        const user = document.getElementById('login-username').value.trim();
-        
-        if (!user) {
-            alert("Entre ton prénom !");
-            return;
-        }
+    // --- 2. GESTION DES GROUPES ---
+    async function showGroups() {
+        document.getElementById('auth-section').classList.add('hidden');
+        document.getElementById('group-section').classList.remove('hidden');
+        document.getElementById('user-display').innerText = currentUser.email;
 
-        if (!participants.includes(user)) {
-            alert("Tu n'es pas dans la liste des inscrits. Clique sur 'S'inscrire'.");
-            return;
-        }
-
-        // Si c'est la première connexion de quelqu'un, on génère le tirage unique
-        if (!finalDraw) {
-            if (participants.length < 3) {
-                alert("Il faut au moins 3 participants pour faire le tirage !");
-                return;
-            }
-            genererLeTirageUnique();
-        }
-
-        afficherResultat(user);
+        const { data: groups } = await supabase.from('groups').select('*');
+        const container = document.getElementById('available-groups');
+        container.innerHTML = groups.map(g => 
+            `<button onclick="joinGroup('${g.id}')">Rejoindre ${g.name}</button>`
+        ).join('');
     }
 
-    function genererLeTirageUnique() {
-        let success = false;
-        let essais = 0;
+    async function showCreateGroup() {
+        const name = prompt("Nom du groupe :");
+        const max = prompt("Nombre de participants requis :");
+        if (!name || !max) return;
 
-        while (!success && essais < 1000) {
-            essais++;
-            let donneurs = [...participants];
-            let receveurs = [...participants];
-            let tempDraw = {};
+        const { data, error } = await supabase.from('groups').insert([
+            { name: name, max_participants: parseInt(max), creator_id: currentUser.id }
+        ]).select();
 
-            // --- TRICHE 1 : Marie offre à Misstache ---
-            if (donneurs.includes("Marie") && receveurs.includes("Misstache")) {
-                tempDraw["Marie"] = "Misstache";
-                donneurs = donneurs.filter(d => d !== "Marie");
-                receveurs = receveurs.filter(r => r !== "Misstache");
+        if (data) joinGroup(data[0].id);
+    }
+
+    async function joinGroup(groupId) {
+        currentGroupId = groupId;
+        // Inscription dans memberships
+        await supabase.from('memberships').upsert({ group_id: groupId, user_id: currentUser.id });
+        loadDashboard();
+    }
+
+    // --- 3. TIRAGE ET AFFICHAGE ---
+    async function loadDashboard() {
+        document.getElementById('group-section').classList.add('hidden');
+        document.getElementById('dashboard-section').classList.remove('hidden');
+
+        // Récupérer infos groupe + membres
+        const { data: group } = await supabase.from('groups').select('*').eq('id', currentGroupId).single();
+        const { data: members } = await supabase.from('memberships').select('user_id').eq('group_id', currentGroupId);
+
+        document.getElementById('group-name-display').innerText = group.name;
+        document.getElementById('participant-count').innerText = `${members.length} / ${group.max_participants} participants`;
+
+        // Si le groupe est complet, on permet de voir sa cible
+        if (members.length >= group.max_participants) {
+            document.getElementById('btn-reveal').classList.remove('hidden');
+            // SEUL LE CRÉATEUR DÉCLENCHE LE TIRAGE RÉEL UNE FOIS
+            if (currentUser.id === group.creator_id) {
+                checkAndGenerateDraw(group, members);
             }
-
-            // Mélange aléatoire du reste
-            receveurs.sort(() => Math.random() - 0.5);
-
-            let possible = true;
-            for (let i = 0; i < donneurs.length; i++) {
-                let d = donneurs[i];
-                let r = receveurs[i];
-
-                // --- TRICHE 2 : Luca ne peut PAS avoir Marie ---
-                // + Règle de base : Pas soi-même
-                if (d === r || (d === "Luca" && r === "Marie")) {
-                    possible = false;
-                    break;
-                }
-                tempDraw[d] = r;
-            }
-
-            if (possible) {
-                finalDraw = tempDraw;
-                localStorage.setItem('santa_draw', JSON.stringify(finalDraw));
-                success = true;
-            }
-        }
-        
-        if (!success) {
-            console.error("Échec du tirage : Contraintes impossibles.");
         }
     }
 
-    function afficherResultat(user) {
-        const cible = finalDraw[user];
-        if (cible) {
-            document.getElementById('login-form').style.display = 'none';
-            document.getElementById('title').innerText = "🎄 Bonjour " + user;
-            document.getElementById('result-area').style.display = 'block';
-            document.getElementById('target-name').innerText = cible;
+async function checkAndGenerateDraw(group, members) {
+    // 1. Récupérer les profils (ID + Username) de tous les membres du groupe
+    const memberIds = members.map(m => m.user_id);
+    const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', memberIds);
+
+    // 2. Vérifier si le tirage existe déjà dans la table memberships
+    const { data: existing } = await supabase
+        .from('memberships')
+        .select('target_id')
+        .eq('group_id', currentGroupId)
+        .not('target_id', 'is', null);
+
+    if (existing.length === 0) {
+        // 3. Lancer l'algorithme avec la logique de triche
+        const draw = performLogicDraw(profiles);
+        
+        // 4. Enregistrer chaque affectation dans Supabase
+        for (const [donorId, targetId] of Object.entries(draw)) {
+            await supabase
+                .from('memberships')
+                .update({ target_id: targetId })
+                .match({ group_id: currentGroupId, user_id: donorId });
         }
+        console.log("Tirage terminé et enregistré !");
+    }
+}
+
+function performLogicDraw(profiles) {
+    let success = false;
+    let finalMap = {};
+    let attempts = 0;
+
+    while (!success && attempts < 1000) {
+        attempts++;
+        let donors = [...profiles];
+        let receivers = [...profiles];
+        let tempDraw = {};
+
+        // --- PARTIE TRICHE : Marie -> Misstache ---
+        const marie = donors.find(p => p.username === "Marie");
+        const misstache = receivers.find(p => p.username === "Misstache");
+
+        if (marie && misstache) {
+            tempDraw[marie.id] = misstache.id;
+            // On les retire des listes pour ne pas les réutiliser
+            donors = donors.filter(d => d.id !== marie.id);
+            receivers = receivers.filter(r => r.id !== misstache.id);
+        }
+
+        // Mélange aléatoire du reste
+        receivers.sort(() => Math.random() - 0.5);
+
+        let possible = true;
+        for (let i = 0; i < donors.length; i++) {
+            const donor = donors[i];
+            const receiver = receivers[i];
+
+            // Règle 1 : Pas de soi-même
+            if (donor.id === receiver.id) {
+                possible = false;
+                break;
+            }
+
+            // Règle 2 : Luca ne peut pas tirer Marie
+            if (donor.username === "Luca" && receiver.username === "Marie") {
+                possible = false;
+                break;
+            }
+
+            tempDraw[donor.id] = receiver.id;
+        }
+
+        if (possible) {
+            success = true;
+            finalMap = tempDraw;
+        }
+    }
+    return finalMap;
+}
+
+    async function revealTarget() {
+        const { data } = await supabase.from('memberships')
+            .select('target_id').match({ group_id: currentGroupId, user_id: currentUser.id }).single();
+        
+        // On récupère le nom de l'utilisateur cible (via une jointure ou un select)
+        document.getElementById('target-display').innerText = "Cible ID: " + data.target_id;
+        // Pour afficher le vrai NOM, il faudrait une table profiles liée
     }
 </script>
-
 </body>
 </html>
